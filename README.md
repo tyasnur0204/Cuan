@@ -1,132 +1,191 @@
-System Design Document (SDD)
+# FinMate — Aplikasi Manajemen Keuangan Mahasiswa
+
+**FinMate** adalah aplikasi web manajemen keuangan personal dan usaha sampingan untuk mahasiswa (seperti proyek *freelance* maupun operasional photobooth **PhoBo**). Aplikasi ini menggabungkan pencatatan arus kas harian, *zero-based budgeting*, laporan keuangan, analisis portofolio investasi terhadap laju inflasi tahunan, serta integrasi **Machine-to-Machine (M2M)** berbasis API Key untuk pencatatan pemasukan usaha secara otomatis.
+
+---
+
+## Fitur Utama
+
+### 1. Dashboard Ringkas
+- Ringkasan **Total Aset**, **Saldo Kas**, **Pemasukan Bulan Ini**, dan **Pengeluaran Bulan Ini**.
+- Kartu **Pertumbuhan Bersih (Setelah Inflasi)** untuk melihat selisih return portofolio terhadap asumsi inflasi tahunan.
+- Indikator progres **Sisa Budget Bulan Ini**.
+- Grafik batang **Arus Kas Bulanan** (6 bulan terakhir) dan daftar **Transaksi Terbaru**.
+
+### 2. Transaksi & Mode Usaha
+- Mendukung 3 tipe transaksi: **Income** (Pemasukan), **Expense** (Pengeluaran), dan **Transfer** antar akun (otomatis memperbarui saldo akun sumber & tujuan).
+- Mode transaksi usaha (`is_business`) untuk memisahkan arus kas bisnis PhoBo/freelance dari keuangan pribadi.
+- Filter berdasarkan tipe, bulan, kategori, akun, pencarian kata kunci, paginasi tabel, dan hapus transaksi dengan pembalikan saldo otomatis.
+
+### 3. Budgeting (*Zero-Based Budgeting*)
+- Penetapan batas anggaran per kategori untuk bulan dan tahun tertentu.
+- Diagram donat distribusi anggaran dengan total pemasukan berada di tengah grafik.
+- Banner status alokasi yang menunjukkan persentase teralokasi hingga sisa alokasi mencapai **Rp 0**.
+
+### 4. Portofolio Investasi & Cek Inflasi
+- Pelacakan aset investasi dengan kelas **RDPU**, **SBN**, dan **Saham** beserta nilai investasinya (`invested_amount`).
+- Perbandingan grafis (*Line Chart*) antara return tahunan setiap aset dengan target laju inflasi (default `3.2%`, dapat disesuaikan di menu Pengaturan).
+- Diagram donat **Alokasi Aset** berdasarkan kelas aset dan status apakah aset mampu mengalahkan inflasi.
+
+### 5. Laporan Keuangan
+- Tab **Ringkasan**, **Pengeluaran**, **Pemasukan**, dan **Perbandingan** per periode bulan/tahun.
+- Grafik rincian kategori pengeluaran & pemasukan serta tabel perbandingan arus kas 6 bulan terakhir.
+
+### 6. Pengaturan & Integrasi M2M PhoBo
+- Manajemen **Profil Pengguna** dan pembaruan **Password**.
+- Pengelolaan **Akun Keuangan** (`Cash`, `Bank`, `Investment`, dan penanda `is_business_account`).
+- Pengaturan asumsi **Laju Inflasi Tahunan (%)** secara lokal (`localStorage`).
+- Pembuatan, aktivasi/nonaktif, dan penghapusan **API Key M2M (`X-API-Key`)** agar server lokal photobooth (**PhoBo Local Server**) dapat mengirim transaksi pemasukan otomatis tanpa login JWT.
+
+---
+
+## Tech Stack
+
+| Lapisan | Teknologi |
+| :--- | :--- |
+| **Backend API** | Python 3.10+, FastAPI, Uvicorn, Pydantic |
+| **ORM & Database** | SQLAlchemy, PostgreSQL (`psycopg2`) |
+| **Keamanan** | JWT (`python-jose`), Hashing Bcrypt (`passlib`), M2M `X-API-Key` |
+| **Frontend Web** | React 18, Vite 6, React Router DOM v6, Axios |
+| **UI & Visualisasi** | Tailwind CSS v3 (Emerald `#067F5B`, Navy `#142C4B`, Bg `#F4F7F5`, Font `Inter`), Recharts |
+| **Deployment** | Docker (`Dockerfile`), Render Blueprint (`render.yaml`) |
+
+---
+
+## Struktur Proyek
+
+```text
+Cuan/
+├── app/
+│   ├── __init__.py
+│   ├── auth.py          # JWT auth & dependency verify_api_key (X-API-Key)
+│   ├── crud.py          # Operasi CRUD database & mutasi saldo atomik
+│   ├── database.py      # Konfigurasi koneksi PostgreSQL & SessionLocal
+│   ├── main.py          # Entrypoint FastAPI, CORS, skema startup & seluruh endpoint API
+│   ├── models.py        # Model SQLAlchemy (6 tabel relasional)
+│   └── schemas.py       # Skema validasi request/response Pydantic
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Budgets.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Layout.jsx        # Sidebar desktop, header pencarian, & mobile bottom nav
+│   │   │   ├── Login.jsx         # Login & registrasi akun
+│   │   │   ├── Portfolio.jsx
+│   │   │   ├── Reports.jsx
+│   │   │   ├── Settings.jsx
+│   │   │   └── Transactions.jsx
+│   │   ├── services/
+│   │   │   └── api.js            # Konfigurasi Axios + interceptor JWT
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── vite.config.js
+├── Dockerfile
+├── render.yaml
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Skema Database PostgreSQL
+
+Tabel otomatis dibuat saat aplikasi backend dijalankan pertama kali (`Base.metadata.create_all`):
+
+1. **`users`** — `id` (UUID PK), `username`, `email`, `hashed_password`, `created_at`
+2. **`accounts`** — `id` (UUID PK), `user_id` (FK), `name`, `type` (`Cash` | `Bank` | `Investment`), `balance`, `is_business_account`
+3. **`transactions`** — `id` (UUID PK), `account_id` (FK), `type` (`Income` | `Expense` | `Transfer`), `category`, `amount`, `transaction_date`, `notes`, `is_business`
+4. **`budgets`** — `id` (UUID PK), `user_id` (FK), `category`, `limit_amount`, `month`, `year`
+5. **`investment_assets`** — `id` (UUID PK), `user_id` (FK), `asset_name`, `asset_class` (`RDPU` | `SBN` | `Saham`), `annual_return_rate`, `invested_amount`
+6. **`api_keys`** — `id` (UUID PK), `key_string` (bcrypt hash), `name`, `is_active`
 
-Aplikasi Manajemen Keuangan Mahasiswa
+---
 
+## Ringkasan API Endpoints
 
+Dokumentasi interaktif tersedia di **`http://localhost:8000/docs`** (Swagger UI).
 
-1\. Pendahuluan
+### Auth & Profil
+- `POST /api/v1/register` — Registrasi pengguna baru
+- `POST /api/v1/login` — Login dan mendapatkan token JWT (`Bearer`)
+- `GET /api/v1/me` — Mengambil profil pengguna yang sedang login
+- `PUT /api/v1/me` — Memperbarui `username` atau `email`
+- `PUT /api/v1/me/password` — Mengubah password pengguna
 
-•	Tujuan: Mendefinisikan arsitektur dan spesifikasi teknis untuk aplikasi manajemen keuangan personal yang dirancang khusus untuk mahasiswa tingkat menengah. Aplikasi ini bertujuan mengelola arus kas dari uang saku, proyek freelance (seperti drafting AutoCAD atau operasional photobooth), serta memantau pertumbuhan aset investasi untuk mengalahkan tingkat inflasi.
+### Akun, Transaksi, & Budget
+- `GET /api/v1/accounts`, `POST /api/v1/accounts`, `DELETE /api/v1/accounts/{account_id}`
+- `GET /api/v1/transactions`, `POST /api/v1/transactions`, `DELETE /api/v1/transactions/{transaction_id}`
+- `GET /api/v1/budgets`, `POST /api/v1/budgets`, `DELETE /api/v1/budgets/{budget_id}`
 
-•	Ruang Lingkup: Aplikasi akan mencakup pencatatan transaksi masuk/keluar, zero-based budgeting, pelacakan portofolio investasi (RDPU, SBN, Saham), dan dasbor analitik komparasi nilai aset terhadap inflasi tahunan.
+### Dashboard, Laporan, & Investasi
+- `GET /api/v1/dashboard/summary` — KPI ringkasan, pertumbuhan riil vs inflasi, arus kas 6 bulan, transaksi terbaru
+- `GET /api/v1/reports/summary` — Rekap bulanan, breakdown kategori, perbandingan 6 bulan
+- `GET /api/v1/investments/inflation-check` — Kalkulasi *net real return* dan alokasi kelas aset
+- `POST /api/v1/investments`, `DELETE /api/v1/investments/{asset_id}`
 
-2\. Tinjauan Sistem \& Teknologi (Tech Stack)
+### Integrasi M2M (PhoBo Local Server)
+- `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `PATCH /api/v1/api-keys/{key_id}/toggle`, `DELETE /api/v1/api-keys/{key_id}` *(Auth JWT)*
+- `POST /api/v1/transactions/auto-log` *(Auth Header `X-API-Key`)* — Mencatat pemasukan otomatis sebagai tipe `"Income"`, kategori `"Usaha PhoBo"`, dan akun bisnis (`is_business_account=True`).
 
-Mengingat pendekatan pengembangan yang sering menggunakan vibe coding dengan AI (Cursor, Windsurf), tumpukan teknologi dipilih berdasarkan kemudahan scaffolding dan dukungan komunitas yang masif.
+Contoh pemanggilan M2M:
 
-•	Frontend (Web/Mobile App): React.js (Web) atau Flutter (Mobile) untuk antarmuka yang responsif.
+```bash
+curl -X POST "http://localhost:8000/api/v1/transactions/auto-log" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: fm_xxxxxxxxxxxxxxxxx" \
+  -d '{"nominal": 35000, "tanggal": "2026-11-10"}'
+```
 
-•	Backend (API): Python menggunakan kerangka kerja FastAPI. Sangat efisien, mendukung asinkron, dan mudah dimodelkan untuk perhitungan matematis/statistik.
+---
 
-•	Database: PostgreSQL (Relasional) untuk menjaga integritas data transaksi keuangan yang ketat.
+## Cara Menjalankan Secara Lokal
 
-•	Hosting/Deployment: VPS Linux (seperti Ubuntu Server) menggunakan kontainerisasi Docker.
+### Prasyarat
+- **Python 3.10+**
+- **Node.js 18+** dan `npm`
+- **PostgreSQL** berjalan dengan database bernama `cuan_db`
 
-3\. Arsitektur Sistem
+### 1. Konfigurasi Variabel Lingkungan (Opsional)
+Secara default backend menggunakan:
+- `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cuan_db`
+- `JWT_SECRET_KEY=finmate-secret-key-change-in-production-2026`
 
-Sistem menggunakan arsitektur Client-Server standar dengan pemisahan antara antarmuka pengguna, logika bisnis (API), dan penyimpanan data.
+Dan frontend menggunakan:
+- `VITE_API_URL=http://localhost:8000/api/v1`
 
-•	Presentation Layer (Client): Menampilkan visualisasi data (grafik pie chart pengeluaran, grafik garis pertumbuhan aset).
+Atur variabel lingkungan tersebut sesuai kebutuhan sebelum menjalankan aplikasi di environment produksi.
 
-•	Application Layer (FastAPI): Menangani logika zero-based budgeting, kalkulasi compound interest dari investasi, dan mengkategorikan transaksi.
+### 2. Jalankan Backend (FastAPI)
 
-•	Data Layer (PostgreSQL): Menyimpan seluruh entri finansial.
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-4\. Desain Database (Skema Relasional)
+Backend akan aktif di `http://localhost:8000` (Swagger UI di `http://localhost:8000/docs`).
 
-Tabel Users
+### 3. Jalankan Frontend (React + Vite)
 
-•	id (UUID, Primary Key)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-•	username (Varchar)
+Frontend akan aktif di `http://localhost:3000`.
 
-•	email (Varchar)
+Untuk mem-build bundel produksi frontend:
 
-•	created\_at (Timestamp)
+```bash
+cd frontend
+npm run build
+```
 
-Tabel Accounts
+---
 
-•	id (UUID, Primary Key)
+## Deployment
 
-•	user\_id (UUID, Foreign Key)
-
-•	name (Varchar) - cth: "Gopay", "Bank BCA", "Bibit RDPU"
-
-•	type (Enum: Cash, Bank, Investment)
-
-•	balance (Decimal)
-
-Tabel Transactions
-
-•	id (UUID, Primary Key)
-
-•	account\_id (UUID, Foreign Key)
-
-•	type (Enum: Income, Expense, Transfer)
-
-•	category (Varchar)
-
-•	amount (Decimal)
-
-•	transaction\_date (Date)
-
-•	notes (Text)
-
-Tabel Budgets
-
-•	id (UUID, Primary Key)
-
-•	user\_id (UUID, Foreign Key)
-
-•	category (Varchar)
-
-•	limit\_amount (Decimal)
-
-•	month (Int)
-
-•	year (Int)
-
-Tabel Investment\_Assets
-
-•	id (UUID, Primary Key)
-
-•	user\_id (UUID, Foreign Key)
-
-•	asset\_name (Varchar)
-
-•	asset\_class (Enum: RDPU, SBN, Saham)
-
-•	annual\_return\_rate (Decimal)
-
-5\. Desain API (Endpoints)
-
-•	GET /api/v1/dashboard/summary: Mengembalikan total aset, pengeluaran bulan ini, dan sisa budget.
-
-•	POST /api/v1/transactions: Mencatat pemasukan atau pengeluaran baru (memperbarui balance pada Accounts).
-
-•	GET /api/v1/transactions?month=11\&year=2026: Menarik histori transaksi bulanan.
-
-•	POST /api/v1/budgets: Menetapkan batas pengeluaran per kategori di awal bulan.
-
-•	GET /api/v1/investments/inflation-check: Mengkalkulasi nilai aset saat ini dikurangi target inflasi tahunan (misal: 3.2%) untuk melihat pertumbuhan aset riil.
-
-6\. Desain Antarmuka Pengguna (UI/UX)
-
-•	Dasbor Utama (Beranda): Menampilkan sisa kas operasional vs. batas budget. Menampilkan metrik "Pertumbuhan Bersih (Setelah Inflasi)".
-
-•	Halaman Transaksi: Formulir input cepat (tanggal, nominal, kategori, akun sumber). Memiliki mode khusus untuk pemasukan bisnis (freelance atau usaha fisik).
-
-•	Halaman Anggaran (Budgeting): Mengadopsi prinsip zero-based, di mana total pemasukan bulan tersebut dialokasikan ke masing-masing "amplop" hingga bersisa Rp0.
-
-•	Halaman Portofolio: Grafik garis (line chart) yang membandingkan garis pertumbuhan investasi dengan garis inflasi riil untuk memvalidasi strategi keuangan.
-
-7\. Kebutuhan Non-Fungsional \& Keamanan
-
-•	Performa: Endpoint dasbor utama harus merespons di bawah 500ms agar aplikasi terasa ringan.
-
-•	Keamanan: Autentikasi berbasis JWT (JSON Web Tokens). Semua password pengguna dienkripsi menggunakan hashing bcrypt.
-
-•	Skalabilitas: API didesain stateless sehingga memungkinkan peningkatan spesifikasi server atau penambahan node jika sistem ingin di-hosting dan dibuka untuk publik di masa depan.
-
-
-
+Repositori ini menyertakan [`Dockerfile`](./Dockerfile) untuk kontainerisasi backend FastAPI dan [`render.yaml`](./render.yaml) untuk deployment otomatis di Render beserta PostgreSQL managed database.
