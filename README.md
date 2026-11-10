@@ -154,7 +154,8 @@ Secara default backend menggunakan:
 - `JWT_SECRET_KEY=finmate-secret-key-change-in-production-2026`
 
 Dan frontend menggunakan:
-- `VITE_API_URL=http://localhost:8000/api/v1`
+- Mode *development* (`npm run dev`): default `http://localhost:8000/api/v1` (atau `VITE_API_URL`)
+- Mode *production build* (`npm run build`): default `/api/v1` (*same-origin* ketika dilayani oleh FastAPI), atau override dengan `VITE_API_URL` jika frontend di-host terpisah.
 
 Atur variabel lingkungan tersebut sesuai kebutuhan sebelum menjalankan aplikasi di environment produksi.
 
@@ -186,6 +187,11 @@ npm run build
 
 ---
 
-## Deployment
+## Deployment ke Web Publik
 
-Repositori ini menyertakan [`Dockerfile`](./Dockerfile) untuk kontainerisasi backend FastAPI dan [`render.yaml`](./render.yaml) untuk deployment otomatis di Render beserta PostgreSQL managed database.
+Repositori ini menggunakan **multi-stage [`Dockerfile`](./Dockerfile)** (build React frontend dengan Node 20 lalu menyajikan hasilnya bersama FastAPI dalam **satu URL publik** beserta PostgreSQL).
+
+- **Render (Blueprint `render.yaml`)**: Deploy 1-klik melalui [`render.yaml`](./render.yaml) (otomatis membuat web service `finmate-web` + managed database `finmate-db`), atau buka:
+  `https://render.com/deploy?repo=https://github.com/tyasnur0204/Cuan`
+- **Railway**: Hubungkan repositori GitHub ini di Railway lalu tambahkan plugin **PostgreSQL** (`DATABASE_URL` & `JWT_SECRET_KEY` otomatis terdeteksi).
+- **Mode Single-Server Lokal**: Setelah menjalankan `npm run build` di folder `frontend/`, FastAPI di `http://localhost:8000` juga langsung menyajikan antarmuka web di `/`.

@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -917,3 +920,58 @@ def delete_api_key(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="API Key tidak ditemukan",
         )
+
+
+# ---------------------------------------------------------------------------
+# Health Check & Built Frontend SPA Serving (Production / Single-URL Mode)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/health", tags=["Health"])
+def health_check() -> dict:
+    return {"status": "ok", "service": "FinMate Web"}
+
+
+FRONTEND_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+FRONTEND_ASSETS_DIR = FRONTEND_DIST_DIR / "assets"
+
+if FRONTEND_ASSETS_DIR.is_dir():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(FRONTEND_ASSETS_DIR)),
+        name="frontend-assets",
+    )
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend_spa(full_path: str):
+    if (
+        full_path == "api"
+        or full_path.startswith("api/")
+        or full_path in {"docs", "redoc", "openapi.json"}
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not Found",
+        )
+
+    index_file = FRONTEND_DIST_DIR / "index.html"
+    if not index_file.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Frontend belum di-build. Jalankan npm run build atau gunakan dev server frontend.",
+        )
+
+    dist_root = FRONTEND_DIST_DIR.resolve()
+    candidate = (dist_root / full_path).resolve()
+    try:
+        candidate.relative_to(dist_root)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not Found",
+        )
+
+    if full_path and candidate.is_file():
+        return FileResponse(str(candidate))
+    return FileResponse(str(index_file))
