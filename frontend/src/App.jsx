@@ -4,6 +4,8 @@ import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
 import Budgets from './components/Budgets';
 import Portfolio from './components/Portfolio';
+import Reports from './components/Reports';
+import Settings from './components/Settings';
 import Login from './components/Login';
 
 const ProtectedLayout = () => {
@@ -30,6 +32,8 @@ const App = () => {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

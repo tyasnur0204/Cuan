@@ -17,6 +17,16 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=72)
 
 
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=100)
+    email: Optional[str] = Field(default=None, max_length=255)
+
+
+class PasswordUpdate(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=72)
+    new_password: str = Field(..., min_length=6, max_length=72)
+
+
 class UserLogin(BaseModel):
     email: str = Field(..., max_length=255)
     password: str = Field(..., min_length=1, max_length=72)
@@ -43,7 +53,7 @@ class AccountBase(BaseModel):
 
 
 class AccountCreate(AccountBase):
-    user_id: UUID
+    user_id: Optional[UUID] = None
 
 
 class AccountResponse(AccountBase):
@@ -64,6 +74,7 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     account_id: UUID
+    destination_account_id: Optional[UUID] = None
 
 
 class TransactionResponse(TransactionBase):
@@ -97,7 +108,7 @@ class BudgetBase(BaseModel):
 
 
 class BudgetCreate(BudgetBase):
-    user_id: UUID
+    user_id: Optional[UUID] = None
 
 
 class BudgetResponse(BudgetBase):
@@ -111,10 +122,11 @@ class InvestmentAssetBase(BaseModel):
     asset_name: str = Field(..., min_length=1, max_length=150)
     asset_class: AssetClass
     annual_return_rate: Decimal
+    invested_amount: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
 
 
 class InvestmentAssetCreate(InvestmentAssetBase):
-    user_id: UUID
+    user_id: Optional[UUID] = None
 
 
 class InvestmentAssetResponse(InvestmentAssetBase):
@@ -122,3 +134,19 @@ class InvestmentAssetResponse(InvestmentAssetBase):
     user_id: UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class APIKeyCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+class APIKeyResponse(BaseModel):
+    id: UUID
+    name: str
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class APIKeyCreateResponse(APIKeyResponse):
+    raw_key: str

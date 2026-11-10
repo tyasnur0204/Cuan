@@ -162,6 +162,9 @@ class InvestmentAsset(Base):
         nullable=False,
     )
     annual_return_rate = Column(Numeric(10, 4), nullable=False)
+    invested_amount = Column(
+        Numeric(18, 2), nullable=False, default=Decimal("0.00"), server_default="0.00"
+    )
 
     user = relationship("User", back_populates="investment_assets")
 
