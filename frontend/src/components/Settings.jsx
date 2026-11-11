@@ -374,7 +374,7 @@ const Settings = () => {
                 <input
                   type="text"
                   required
-                  minLength={3}
+                  minLength={2}
                   value={profileForm.username}
                   onChange={(e) =>
                     setProfileForm((p) => ({ ...p, username: e.target.value }))

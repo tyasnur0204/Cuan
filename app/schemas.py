@@ -9,7 +9,7 @@ from app.models import AccountType, AssetClass, TransactionType
 
 
 class UserBase(BaseModel):
-    username: str = Field(..., min_length=3, max_length=100)
+    username: str = Field(..., min_length=2, max_length=100)
     email: str = Field(..., max_length=255)
 
 
@@ -18,7 +18,7 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = Field(default=None, min_length=3, max_length=100)
+    username: Optional[str] = Field(default=None, min_length=2, max_length=100)
     email: Optional[str] = Field(default=None, max_length=255)
 
 

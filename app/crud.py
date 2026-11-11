@@ -56,9 +56,9 @@ def update_user(
 ) -> models.User:
     try:
         if user_update.username is not None:
-            db_user.username = user_update.username
+            db_user.username = user_update.username.strip()
         if user_update.email is not None:
-            db_user.email = user_update.email
+            db_user.email = user_update.email.strip().lower()
         db.commit()
         db.refresh(db_user)
         return db_user

@@ -158,8 +158,8 @@ const Login = () => {
             </h2>
             <p className="text-xs text-gray-500 mt-1">
               {mode === 'login'
-                ? 'Masuk untuk mengakses dashboard keuangan Anda'
-                : 'Daftar gratis untuk mulai mengelola keuangan dengan FinMate'}
+                ? 'Masuk dengan akun Anda, atau daftar bebas pada tab Daftar'
+                : 'Daftar bebas dengan email apa saja untuk mulai mengelola keuangan'}
             </p>
           </div>
 
@@ -218,8 +218,9 @@ const Login = () => {
                   value={formData.username}
                   onChange={handleChange}
                   required
-                  minLength={3}
-                  placeholder="Contoh: Tyas Nur"
+                  minLength={2}
+                  autoComplete="name"
+                  placeholder="Masukkan nama lengkap Anda"
                   className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
                 />
               </div>
@@ -235,7 +236,8 @@ const Login = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                placeholder="tyas.nur@finmate.id"
+                autoComplete="email"
+                placeholder="Masukkan email Anda"
                 className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
               />
             </div>
@@ -251,7 +253,12 @@ const Login = () => {
                 onChange={handleChange}
                 required
                 minLength={6}
-                placeholder="Minimal 6 karakter"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                placeholder={
+                  mode === 'login'
+                    ? 'Masukkan password Anda'
+                    : 'Minimal 6 karakter'
+                }
                 className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
               />
             </div>

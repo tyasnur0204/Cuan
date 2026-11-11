@@ -28,6 +28,13 @@ if engine.dialect.name == "postgresql":
                 "NOT NULL DEFAULT 0.00"
             )
         )
+        conn.execute(text("DROP INDEX IF EXISTS ix_users_username"))
+        conn.execute(
+            text("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_users_username ON users (username)")
+        )
 
 # ---------------------------------------------------------------------------
 # Application instance
@@ -102,7 +109,7 @@ def register_user(
     except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username atau email sudah digunakan",
+            detail="Email sudah terdaftar",
         )
 
 
@@ -153,12 +160,19 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ) -> schemas.UserResponse:
+    if user_update.email is not None:
+        existing = crud.get_user_by_email(db=db, email=user_update.email)
+        if existing is not None and existing.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email sudah digunakan",
+            )
     try:
         return crud.update_user(db=db, db_user=current_user, user_update=user_update)
     except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username atau email sudah digunakan",
+            detail="Email sudah digunakan",
         )
 
 
