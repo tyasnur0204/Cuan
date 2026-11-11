@@ -162,8 +162,6 @@ const Login = () => {
                 <a
                   href={APK_DOWNLOAD_URL}
                   download="CUAN.apk"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-emerald text-xs font-bold hover:bg-white/95 transition-colors shadow-sm"
                 >
                   <svg

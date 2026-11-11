@@ -1,10 +1,38 @@
-export const APK_DOWNLOAD_URL =
+export const APK_DOWNLOAD_URL = '/api/v1/app/download';
+
+export const APK_PROXY_DOWNLOAD_URL = '/api/v1/app/download?proxy=1';
+
+export const APK_DIRECT_GITHUB_URL =
   'https://github.com/tyasnur0204/Cuan/releases/latest/download/CUAN.apk';
 
 export const APK_RELEASE_PAGE_URL =
-  'https://github.com/tyasnur0204/Cuan/releases/latest';
+  'https://github.com/tyasnur0204/Cuan/releases';
 
 export const APP_VERSION_LABEL = 'v1.0.0 · Android APK';
+
+let cachedReleaseInfo = null;
+let releaseFetchPromise = null;
+
+export const fetchApkReleaseInfo = async () => {
+  if (cachedReleaseInfo) return cachedReleaseInfo;
+  if (releaseFetchPromise) return releaseFetchPromise;
+
+  releaseFetchPromise = fetch('/api/v1/app/release', {
+    headers: { Accept: 'application/json' },
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error('Release metadata unavailable');
+      const data = await res.json();
+      cachedReleaseInfo = data;
+      return data;
+    })
+    .catch(() => null)
+    .finally(() => {
+      releaseFetchPromise = null;
+    });
+
+  return releaseFetchPromise;
+};
 
 let deferredInstallPrompt = null;
 let pwaInstalled = false;

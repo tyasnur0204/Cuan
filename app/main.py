@@ -1,12 +1,18 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+import json
+import os
 from pathlib import Path
+import ssl
+import time
 from typing import Optional
+import urllib.error
+import urllib.request
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -944,6 +950,233 @@ def delete_api_key(
 @app.get("/api/v1/health", tags=["Health"])
 def health_check() -> dict:
     return {"status": "ok", "service": "CUAN Web"}
+
+
+_APK_CANDIDATES = [
+    (
+        "CUAN.apk",
+        "cuan-android-latest",
+        "https://github.com/tyasnur0204/Cuan/releases/latest/download/CUAN.apk",
+        "https://github.com/tyasnur0204/Cuan/releases/latest",
+    ),
+    (
+        "CUAN.apk",
+        "cuan-android-latest",
+        "https://github.com/tyasnur0204/Cuan/releases/download/cuan-android-latest/CUAN.apk",
+        "https://github.com/tyasnur0204/Cuan/releases/tag/cuan-android-latest",
+    ),
+    (
+        "FinMate.apk",
+        "android-latest",
+        "https://github.com/tyasnur0204/Cuan/releases/download/android-latest/FinMate.apk",
+        "https://github.com/tyasnur0204/Cuan/releases/tag/android-latest",
+    ),
+]
+_APK_RELEASE_CACHE: dict = {"ts": 0.0, "data": None}
+
+
+def _get_ssl_context() -> ssl.SSLContext:
+    env_ca = os.getenv("SSL_CERT_FILE")
+    if env_ca and os.path.isfile(env_ca):
+        return ssl.create_default_context(cafile=env_ca)
+
+    default_ca = ssl.get_default_verify_paths().cafile
+    if default_ca and os.path.isfile(default_ca):
+        return ssl.create_default_context()
+
+    for candidate in (
+        r"C:\msys64\usr\ssl\certs\ca-bundle.crt",
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/etc/ssl/cert.pem",
+    ):
+        if os.path.isfile(candidate):
+            return ssl.create_default_context(cafile=candidate)
+
+    return ssl.create_default_context()
+
+
+def _probe_apk_asset(url: str, ssl_ctx: ssl.SSLContext) -> tuple[bool, Optional[int]]:
+    # 1) Fast HEAD check
+    try:
+        req = urllib.request.Request(
+            url,
+            method="HEAD",
+            headers={"User-Agent": "CUAN-Web-App/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=6, context=ssl_ctx) as resp:
+            if 200 <= resp.status < 400:
+                content_type = (resp.headers.get("Content-Type") or "").lower()
+                content_len = resp.headers.get("Content-Length")
+                size_bytes = int(content_len) if content_len and content_len.isdigit() else None
+                if (
+                    "android.package-archive" in content_type
+                    or "octet-stream" in content_type
+                    or "zip" in content_type
+                ) and (size_bytes is None or size_bytes > 1024):
+                    return True, size_bytes
+    except Exception:
+        pass
+
+    # 2) Fallback 4-byte Range GET to bypass servers/SAS tokens that disallow HEAD
+    try:
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={
+                "User-Agent": "CUAN-Web-App/1.0",
+                "Range": "bytes=0-3",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
+            if 200 <= resp.status < 400:
+                magic = resp.read(4)
+                if magic[:2] == b"PK":
+                    size_bytes: Optional[int] = None
+                    content_range = resp.headers.get("Content-Range") or ""
+                    if "/" in content_range:
+                        total_part = content_range.rsplit("/", 1)[-1].strip()
+                        if total_part.isdigit():
+                            size_bytes = int(total_part)
+                    elif resp.status == 200:
+                        content_len = resp.headers.get("Content-Length")
+                        if content_len and content_len.isdigit():
+                            size_bytes = int(content_len)
+                    return True, size_bytes
+    except Exception:
+        pass
+
+    return False, None
+
+
+def _resolve_latest_apk_asset() -> dict:
+    now = time.monotonic()
+    cached = _APK_RELEASE_CACHE.get("data")
+    if cached is not None:
+        ttl = 120.0 if (cached.get("available") and cached.get("filename") == "CUAN.apk") else 15.0
+        if (now - _APK_RELEASE_CACHE.get("ts", 0.0)) < ttl:
+            return cached
+
+    ssl_ctx = _get_ssl_context()
+    resolved = {
+        "available": False,
+        "filename": "CUAN.apk",
+        "size_bytes": None,
+        "size_mb": None,
+        "tag_name": "cuan-android-latest",
+        "download_url": _APK_CANDIDATES[1][2],
+        "release_page_url": _APK_CANDIDATES[1][3],
+    }
+
+    for filename, tag_name, url, page_url in _APK_CANDIDATES:
+        ok, size_bytes = _probe_apk_asset(url, ssl_ctx)
+        if ok:
+            resolved = {
+                "available": True,
+                "filename": filename,
+                "size_bytes": size_bytes,
+                "size_mb": round(size_bytes / (1024 * 1024), 1) if size_bytes else None,
+                "tag_name": tag_name,
+                "download_url": url,
+                "release_page_url": page_url,
+            }
+            break
+
+    _APK_RELEASE_CACHE["ts"] = now
+    _APK_RELEASE_CACHE["data"] = resolved
+    return resolved
+
+
+@app.get("/api/v1/app/release", tags=["Mobile App"])
+def get_mobile_app_release() -> dict:
+    info = _resolve_latest_apk_asset()
+    return {
+        "app_name": "CUAN",
+        "tagline": "Catat Uang, Aset Naik",
+        "available": info["available"],
+        "filename": info["filename"],
+        "size_bytes": info["size_bytes"],
+        "size_mb": info["size_mb"],
+        "tag_name": info["tag_name"],
+        "download_url": "/api/v1/app/download",
+        "proxy_download_url": "/api/v1/app/download?proxy=1",
+        "direct_url": info["download_url"],
+        "release_page_url": info["release_page_url"],
+    }
+
+
+@app.api_route("/api/v1/app/download", methods=["GET", "HEAD"], tags=["Mobile App"])
+def download_mobile_app_apk(
+    request: Request,
+    proxy: bool = Query(default=False),
+):
+    info = _resolve_latest_apk_asset()
+    target_url = info.get("download_url") or _APK_CANDIDATES[1][2]
+    filename = info.get("filename") or "CUAN.apk"
+
+    if not proxy:
+        return RedirectResponse(
+            url=target_url,
+            status_code=status.HTTP_302_FOUND,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    ssl_ctx = _get_ssl_context()
+    headers = {"User-Agent": "CUAN-Web-App/1.0"}
+    range_header = request.headers.get("range")
+    if range_header:
+        headers["Range"] = range_header
+
+    method = "HEAD" if request.method == "HEAD" else "GET"
+    req = urllib.request.Request(target_url, method=method, headers=headers)
+    try:
+        upstream = urllib.request.urlopen(req, timeout=20, context=ssl_ctx)
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(
+            status_code=exc.code if exc.code in (404, 416) else status.HTTP_502_BAD_GATEWAY,
+            detail="File APK sedang tidak tersedia dari mirror.",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Gagal mengambil file APK dari mirror.",
+        )
+
+    resp_headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Type": "application/vnd.android.package-archive",
+        "Cache-Control": "no-store",
+    }
+    for h_name in ("Content-Length", "Content-Range", "Accept-Ranges"):
+        h_val = upstream.headers.get(h_name)
+        if h_val:
+            resp_headers[h_name] = h_val
+
+    if method == "HEAD":
+        upstream.close()
+        return StreamingResponse(
+            iter(()),
+            status_code=upstream.status,
+            headers=resp_headers,
+            media_type="application/vnd.android.package-archive",
+        )
+
+    def _stream_chunks():
+        try:
+            while True:
+                chunk = upstream.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            upstream.close()
+
+    return StreamingResponse(
+        _stream_chunks(),
+        status_code=upstream.status,
+        headers=resp_headers,
+        media_type="application/vnd.android.package-archive",
+    )
 
 
 FRONTEND_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"

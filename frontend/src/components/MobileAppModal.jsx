@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import FinMateLogo from './FinMateLogo';
 import {
   APK_DOWNLOAD_URL,
+  APK_PROXY_DOWNLOAD_URL,
   APK_RELEASE_PAGE_URL,
   APP_VERSION_LABEL,
+  fetchApkReleaseInfo,
   subscribePwaInstall,
   triggerPwaInstall,
 } from '../utils/appDownload';
@@ -16,6 +18,8 @@ const MobileAppModal = ({ open, onClose }) => {
     isAndroid: false,
   });
   const [installFeedback, setInstallFeedback] = useState('');
+  const [downloadStarted, setDownloadStarted] = useState(false);
+  const [releaseInfo, setReleaseInfo] = useState(null);
 
   useEffect(() => {
     return subscribePwaInstall(setPwaState);
@@ -23,14 +27,24 @@ const MobileAppModal = ({ open, onClose }) => {
 
   useEffect(() => {
     if (!open) return undefined;
+    let active = true;
+    fetchApkReleaseInfo().then((info) => {
+      if (active && info) setReleaseInfo(info);
+    });
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose?.();
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      active = false;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
+
+  const apkFilename = releaseInfo?.filename || 'CUAN.apk';
+  const apkSizeLabel = releaseInfo?.size_mb ? `${releaseInfo.size_mb} MB` : null;
 
   const handlePwaInstall = async () => {
     const res = await triggerPwaInstall();
@@ -114,9 +128,8 @@ const MobileAppModal = ({ open, onClose }) => {
 
           <a
             href={APK_DOWNLOAD_URL}
-            download="CUAN.apk"
-            target="_blank"
-            rel="noopener noreferrer"
+            download={apkFilename}
+            onClick={() => setDownloadStarted(true)}
             className="w-full py-3 px-4 rounded-xl bg-emerald text-white text-sm font-semibold hover:bg-emerald/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             <svg
@@ -132,17 +145,39 @@ const MobileAppModal = ({ open, onClose }) => {
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            <span>Download CUAN.apk (Android)</span>
+            <span>
+              Download {apkFilename}
+              {apkSizeLabel ? ` (${apkSizeLabel})` : ' (Android)'}
+            </span>
           </a>
+
+          {downloadStarted && (
+            <p className="text-[11px] font-medium text-emerald bg-emerald/10 border border-emerald/20 rounded-lg px-3 py-2">
+              Unduhan <code className="font-mono">{apkFilename}</code> dimulai. Cek bilah
+              notifikasi browser Anda, atau gunakan Link Alternatif di bawah jika terblokir.
+            </p>
+          )}
 
           <ol className="text-[11px] text-gray-600 space-y-1 pl-4 list-decimal">
             <li>Ketuk tombol Download dan pilih Tetap Unduh jika browser bertanya.</li>
-            <li>Buka file <code className="font-mono text-navy">CUAN.apk</code> yang selesai diunduh.</li>
+            <li>Buka file <code className="font-mono text-navy">{apkFilename}</code> yang selesai diunduh.</li>
             <li>Pilih <strong>Pasang (Install)</strong>, lalu masuk dengan akun CUAN Anda.</li>
           </ol>
 
-          <div className="pt-1 flex items-center justify-between text-[11px]">
-            <span className="text-gray-500">Package: id.cuan.app</span>
+          <p className="text-[11px] text-gray-500">
+            Dibuka dari WhatsApp/Instagram? Ketuk menu <code className="font-mono">⋮</code> lalu pilih{' '}
+            <strong>Buka di Browser (Chrome)</strong> agar unduhan lancar.
+          </p>
+
+          <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <a
+              href={APK_PROXY_DOWNLOAD_URL}
+              download={apkFilename}
+              onClick={() => setDownloadStarted(true)}
+              className="font-semibold text-navy hover:text-emerald hover:underline"
+            >
+              Unduh via Mirror Server
+            </a>
             <a
               href={APK_RELEASE_PAGE_URL}
               target="_blank"

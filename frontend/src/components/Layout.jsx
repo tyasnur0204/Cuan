@@ -654,8 +654,6 @@ const Layout = ({ children }) => {
               <a
                 href={APK_DOWNLOAD_URL}
                 download="CUAN.apk"
-                target="_blank"
-                rel="noopener noreferrer"
                 className="px-2.5 py-1.5 rounded-lg bg-white text-emerald text-[11px] font-bold shadow-sm hover:bg-white/95 transition-colors"
               >
                 Unduh APK

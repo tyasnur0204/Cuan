@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
   APK_DOWNLOAD_URL,
+  APK_PROXY_DOWNLOAD_URL,
   APK_RELEASE_PAGE_URL,
   APP_VERSION_LABEL,
+  fetchApkReleaseInfo,
   subscribePwaInstall,
   triggerPwaInstall,
 } from '../utils/appDownload';
@@ -64,6 +66,8 @@ const Settings = () => {
     isAndroid: false,
   });
   const [pwaFeedback, setPwaFeedback] = useState('');
+  const [apkReleaseInfo, setApkReleaseInfo] = useState(null);
+  const [apkDownloadStarted, setApkDownloadStarted] = useState(false);
 
   // Feedback alerts
   const [statusMsg, setStatusMsg] = useState('');
@@ -110,7 +114,15 @@ const Settings = () => {
   }, []);
 
   useEffect(() => {
-    return subscribePwaInstall(setPwaState);
+    const unsub = subscribePwaInstall(setPwaState);
+    let active = true;
+    fetchApkReleaseInfo().then((info) => {
+      if (active && info) setApkReleaseInfo(info);
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const handlePwaInstall = async () => {
@@ -965,9 +977,8 @@ const Settings = () => {
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href={APK_DOWNLOAD_URL}
-                    download="CUAN.apk"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    download={apkReleaseInfo?.filename || 'CUAN.apk'}
+                    onClick={() => setApkDownloadStarted(true)}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald text-white text-sm font-semibold hover:bg-emerald/90 transition-colors shadow-sm"
                   >
                     <svg
@@ -983,7 +994,19 @@ const Settings = () => {
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                       />
                     </svg>
-                    <span>Download CUAN.apk</span>
+                    <span>
+                      Download {apkReleaseInfo?.filename || 'CUAN.apk'}
+                      {apkReleaseInfo?.size_mb ? ` (${apkReleaseInfo.size_mb} MB)` : ''}
+                    </span>
+                  </a>
+
+                  <a
+                    href={APK_PROXY_DOWNLOAD_URL}
+                    download={apkReleaseInfo?.filename || 'CUAN.apk'}
+                    onClick={() => setApkDownloadStarted(true)}
+                    className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-gray-200 text-navy text-xs font-semibold hover:bg-gray-50 transition-colors"
+                  >
+                    Unduh via Mirror Server
                   </a>
 
                   <a
@@ -995,6 +1018,14 @@ const Settings = () => {
                     Lihat Halaman Rilis →
                   </a>
                 </div>
+
+                {apkDownloadStarted && (
+                  <p className="text-xs font-medium text-emerald bg-emerald/10 border border-emerald/20 rounded-lg px-3 py-2">
+                    Unduhan <code className="font-mono">{apkReleaseInfo?.filename || 'CUAN.apk'}</code>{' '}
+                    dimulai. Periksa bilah notifikasi browser Anda, atau gunakan tombol{' '}
+                    <strong>Unduh via Mirror Server</strong> jika link utama tidak merespons.
+                  </p>
+                )}
 
                 <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal pt-1">
                   <li>Unduh file <code className="font-mono text-navy">CUAN.apk</code> di HP Android Anda.</li>
