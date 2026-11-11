@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { APK_DOWNLOAD_URL } from '../utils/appDownload';
 import FinMateLogo from './FinMateLogo';
+import MobileAppModal from './MobileAppModal';
 
 const navItems = [
   {
@@ -161,8 +163,25 @@ const Layout = ({ children }) => {
   const [storedUser, setStoredUser] = useState(getStoredUser);
   const [notifOpen, setNotifOpen] = useState(false);
   const [alerts, setAlerts] = useState([]);
+  const [appModalOpen, setAppModalOpen] = useState(false);
+  const [showMobileBanner, setShowMobileBanner] = useState(() => {
+    try {
+      return !localStorage.getItem('finmate_hide_mobile_app_banner');
+    } catch {
+      return true;
+    }
+  });
   const notifRef = useRef(null);
   const navigate = useNavigate();
+
+  const dismissMobileBanner = () => {
+    try {
+      localStorage.setItem('finmate_hide_mobile_app_banner', '1');
+    } catch {
+      // Ignore storage quota / private mode issues
+    }
+    setShowMobileBanner(false);
+  };
 
   useEffect(() => {
     const syncUser = () => setStoredUser(getStoredUser());
@@ -399,6 +418,30 @@ const Layout = ({ children }) => {
 
           <button
             type="button"
+            onClick={() => {
+              setSidebarOpen(false);
+              setAppModalOpen(true);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition-colors"
+          >
+            <svg
+              className="w-5 h-5 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+              />
+            </svg>
+            <span>Download App Mobile</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
           >
@@ -478,7 +521,29 @@ const Layout = ({ children }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setAppModalOpen(true)}
+              className="md:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald/10 text-emerald border border-emerald/25 text-xs font-semibold hover:bg-emerald/15 transition-colors shrink-0"
+              aria-label="Download Aplikasi Mobile"
+            >
+              <svg
+                className="w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              <span>App</span>
+            </button>
+
             <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-light text-xs font-medium text-navy/80 border border-gray-200/60">
               <svg
                 className="w-3.5 h-3.5 text-emerald"
@@ -567,6 +632,58 @@ const Layout = ({ children }) => {
           </div>
         </header>
 
+        {/* Mobile Web App Download Banner */}
+        {showMobileBanner && (
+          <div className="md:hidden bg-gradient-to-r from-[#067F5B] to-[#044D37] text-white px-3.5 py-2.5 flex items-center justify-between gap-2 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setAppModalOpen(true)}
+              className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+            >
+              <FinMateLogo className="w-8 h-8" variant="glass" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-tight truncate">
+                  FinMate App (Android)
+                </p>
+                <p className="text-[10px] text-white/80 truncate">
+                  Unduh APK atau pasang di layar HP
+                </p>
+              </div>
+            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <a
+                href={APK_DOWNLOAD_URL}
+                download="FinMate.apk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1.5 rounded-lg bg-white text-emerald text-[11px] font-bold shadow-sm hover:bg-white/95 transition-colors"
+              >
+                Unduh APK
+              </a>
+              <button
+                type="button"
+                onClick={dismissMobileBanner}
+                aria-label="Tutup banner download aplikasi"
+                className="p-1 text-white/75 hover:text-white"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Content */}
         <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
           {children ?? <Outlet />}
@@ -643,6 +760,11 @@ const Layout = ({ children }) => {
           <span>{navItems[3].shortLabel}</span>
         </NavLink>
       </nav>
+
+      <MobileAppModal
+        open={appModalOpen}
+        onClose={() => setAppModalOpen(false)}
+      />
     </div>
   );
 };

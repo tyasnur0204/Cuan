@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { APK_DOWNLOAD_URL } from '../utils/appDownload';
 import FinMateLogo from './FinMateLogo';
+import MobileAppModal from './MobileAppModal';
 
 const FEATURES = [
   'Zero-Based Budgeting',
@@ -21,6 +23,7 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [appModalOpen, setAppModalOpen] = useState(false);
 
   if (localStorage.getItem('access_token')) {
     return <Navigate to="/dashboard" replace />;
@@ -103,7 +106,7 @@ const Login = () => {
     <div className="min-h-screen bg-bg-light flex items-center justify-center p-4 md:p-6">
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-12">
         {/* Hero Brand Panel (Matching FinMate Splash & Identity) */}
-        <div className="md:col-span-5 relative bg-gradient-to-br from-[#067F5B] via-[#06694B] to-[#044D37] text-white p-8 flex flex-col justify-between overflow-hidden">
+        <div className="md:col-span-5 min-w-0 relative bg-gradient-to-br from-[#067F5B] via-[#06694B] to-[#044D37] text-white p-6 sm:p-8 flex flex-col justify-between overflow-hidden">
           <div className="absolute -bottom-16 -right-16 w-52 h-52 rounded-full bg-white/10 pointer-events-none" />
           <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-white/5 pointer-events-none" />
 
@@ -145,13 +148,57 @@ const Login = () => {
             </ul>
           </div>
 
-          <p className="relative z-10 text-xs text-white/75 italic mt-8 pt-4 border-t border-white/15">
-            Kelola lebih cerdas, hidup lebih tenang.
-          </p>
+          <div className="relative z-10 mt-6 pt-4 border-t border-white/15 space-y-3">
+            <div className="rounded-xl bg-white/10 border border-white/20 p-3.5 space-y-2.5 backdrop-blur-sm">
+              <div>
+                <p className="text-xs font-bold text-white leading-tight">
+                  Tersedia Aplikasi Android (.apk)
+                </p>
+                <p className="text-[11px] text-white/80 mt-0.5 leading-snug">
+                  Download aplikasi mobile FinMate atau pasang di layar HP Anda
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={APK_DOWNLOAD_URL}
+                  download="FinMate.apk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-emerald text-xs font-bold hover:bg-white/95 transition-colors shadow-sm"
+                >
+                  <svg
+                    className="w-3.5 h-3.5 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  <span>Download APK</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setAppModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-white/15 text-white text-xs font-medium hover:bg-white/25 transition-colors"
+                >
+                  Cara Pasang / iOS
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-white/75 italic">
+              Kelola lebih cerdas, hidup lebih tenang.
+            </p>
+          </div>
         </div>
 
         {/* Auth Form Panel */}
-        <div className="md:col-span-7 p-6 sm:p-10 flex flex-col justify-center">
+        <div className="md:col-span-7 min-w-0 p-6 sm:p-10 flex flex-col justify-center">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-navy">
               {mode === 'login' ? 'Selamat Datang Kembali' : 'Buat Akun Baru'}
@@ -308,8 +355,24 @@ const Login = () => {
               </>
             )}
           </p>
+
+          <div className="md:hidden mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-2 text-xs">
+            <span className="text-gray-500">Ingin pakai aplikasi Android?</span>
+            <button
+              type="button"
+              onClick={() => setAppModalOpen(true)}
+              className="font-semibold text-emerald hover:underline shrink-0"
+            >
+              Download App →
+            </button>
+          </div>
         </div>
       </div>
+
+      <MobileAppModal
+        open={appModalOpen}
+        onClose={() => setAppModalOpen(false)}
+      />
     </div>
   );
 };

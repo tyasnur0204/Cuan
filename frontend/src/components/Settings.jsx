@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import {
+  APK_DOWNLOAD_URL,
+  APK_RELEASE_PAGE_URL,
+  APP_VERSION_LABEL,
+  subscribePwaInstall,
+  triggerPwaInstall,
+} from '../utils/appDownload';
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('id-ID', {
@@ -50,6 +57,13 @@ const Settings = () => {
   const [inflationRate, setInflationRate] = useState(
     () => localStorage.getItem('finmate_inflation_rate') || '3.2'
   );
+  const [pwaState, setPwaState] = useState({
+    canInstallPwa: false,
+    isInstalled: false,
+    isIos: false,
+    isAndroid: false,
+  });
+  const [pwaFeedback, setPwaFeedback] = useState('');
 
   // Feedback alerts
   const [statusMsg, setStatusMsg] = useState('');
@@ -94,6 +108,21 @@ const Settings = () => {
     loadAllSettingsData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    return subscribePwaInstall(setPwaState);
+  }, []);
+
+  const handlePwaInstall = async () => {
+    const res = await triggerPwaInstall();
+    if (res?.outcome === 'accepted') {
+      setPwaFeedback('Pintasan FinMate berhasil dipasang ke layar utama!');
+    } else if (res?.outcome === 'unavailable') {
+      setPwaFeedback(
+        'Gunakan menu browser (Bagikan di Safari atau ⋮ di Chrome) lalu pilih Tambah ke Layar Utama.'
+      );
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -302,6 +331,16 @@ const Settings = () => {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      key: 'mobile',
+      title: 'Aplikasi Mobile (APK)',
+      desc: 'Download FinMate Android APK atau pasang pintasan di layar HP',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
         </svg>
       ),
     },
@@ -896,7 +935,116 @@ const Settings = () => {
             </div>
           )}
 
-          {/* Section 5: Tentang Aplikasi */}
+          {/* Section 5: Aplikasi Mobile (APK) */}
+          {activeSection === 'mobile' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="text-base font-semibold text-navy">
+                    Download Aplikasi Mobile FinMate
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Gunakan FinMate langsung dari layar HP Android atau iPhone Anda
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald/10 text-emerald">
+                  {APP_VERSION_LABEL}
+                </span>
+              </div>
+
+              <div className="rounded-xl bg-gradient-to-br from-[#067F5B]/10 via-emerald/5 to-bg-light border border-emerald/25 p-5 space-y-3">
+                <div>
+                  <p className="text-sm font-bold text-navy">
+                    FinMate Android APK (React Native)
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Aplikasi mobile native dengan data yang otomatis tersinkron ke akun web FinMate Anda.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <a
+                    href={APK_DOWNLOAD_URL}
+                    download="FinMate.apk"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald text-white text-sm font-semibold hover:bg-emerald/90 transition-colors shadow-sm"
+                  >
+                    <svg
+                      className="w-4 h-4 shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                    <span>Download FinMate.apk</span>
+                  </a>
+
+                  <a
+                    href={APK_RELEASE_PAGE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white border border-gray-200 text-navy text-xs font-semibold hover:bg-gray-50 transition-colors"
+                  >
+                    Lihat Halaman Rilis →
+                  </a>
+                </div>
+
+                <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal pt-1">
+                  <li>Unduh file <code className="font-mono text-navy">FinMate.apk</code> di HP Android Anda.</li>
+                  <li>Ketuk file hasil unduhan dan pilih <strong>Pasang (Install)</strong>.</li>
+                  <li>Buka FinMate dan masuk menggunakan email yang sama seperti di versi web.</li>
+                </ol>
+              </div>
+
+              <div className="rounded-xl bg-bg-light border border-gray-200/80 p-4 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-bold text-navy">
+                      Alternatif Cepat: Pasang ke Layar Utama (Android & iPhone)
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Buka FinMate seperti aplikasi tanpa perlu mengunduh file APK
+                    </p>
+                  </div>
+                  {pwaState.isInstalled && (
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald/15 text-emerald">
+                      Terpasang
+                    </span>
+                  )}
+                </div>
+
+                {pwaState.canInstallPwa && !pwaState.isInstalled && (
+                  <button
+                    type="button"
+                    onClick={handlePwaInstall}
+                    className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-navy text-xs font-semibold hover:bg-gray-50 transition-colors"
+                  >
+                    + Pasang Pintasan Sekarang
+                  </button>
+                )}
+
+                {pwaFeedback && (
+                  <p className="text-xs font-medium text-emerald">{pwaFeedback}</p>
+                )}
+
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  <strong>Android Chrome:</strong> ketuk menu <code className="font-mono">⋮</code> →{' '}
+                  <strong>Tambahkan ke layar utama</strong>. ·{' '}
+                  <strong>iPhone Safari:</strong> ketuk ikon <strong>Bagikan</strong> →{' '}
+                  <strong>Tambah ke Layar Utama</strong>.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Section 6: Tentang Aplikasi */}
           {activeSection === 'about' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4 text-sm text-navy/85">
               <div className="flex items-center justify-between gap-3">
