@@ -366,13 +366,13 @@ const Portfolio = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <h2 className="text-base font-semibold text-navy mb-1">
-              Investasi vs Inflasi
+              Pertumbuhan Investasi vs Inflasi
             </h2>
             <p className="text-xs text-gray-500 mb-4">
               Perbandingan return tahunan masing-masing aset (%) terhadap laju
               inflasi
             </p>
-            <ResponsiveContainer height={270} width="100%">
+            <ResponsiveContainer height={300} width="100%">
               <LineChart
                 data={chartData}
                 margin={{ top: 10, right: 20, left: -10, bottom: 5 }}
@@ -497,6 +497,14 @@ const Portfolio = () => {
                     );
                   })}
                 </div>
+
+                <a
+                  href="#tabel-detail-aset"
+                  className="mt-4 pt-3 border-t border-gray-100 text-xs font-semibold text-emerald hover:underline flex items-center justify-end gap-1"
+                >
+                  <span>Lihat Detail</span>
+                  <span aria-hidden="true">→</span>
+                </a>
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
@@ -509,7 +517,10 @@ const Portfolio = () => {
 
       {/* Tabel Detail Aset */}
       {assets.length === 0 ? (
-        <div className="p-8 bg-white shadow-sm rounded-xl border border-gray-100 text-center space-y-2">
+        <div
+          id="tabel-detail-aset"
+          className="p-8 bg-white shadow-sm rounded-xl border border-gray-100 text-center space-y-2"
+        >
           <p className="text-sm font-medium text-navy">
             Belum ada aset investasi yang tercatat.
           </p>
@@ -519,7 +530,10 @@ const Portfolio = () => {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto bg-white shadow-sm rounded-xl border border-gray-100">
+        <div
+          id="tabel-detail-aset"
+          className="overflow-x-auto bg-white shadow-sm rounded-xl border border-gray-100"
+        >
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b bg-bg-light text-xs text-navy/80">

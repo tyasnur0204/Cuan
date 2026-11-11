@@ -268,22 +268,52 @@ const Settings = () => {
     {
       key: 'accounts',
       title: 'Akun Keuangan',
-      desc: 'Kelola dompet tunai, rekening bank, akun investasi & usaha PhoBo',
+      desc: 'Kelola dompet tunai, rekening bank, investasi & akun usaha PhoBo',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+      ),
     },
     {
       key: 'security',
-      title: 'Keamanan & API Key M2M',
-      desc: 'Ubah password dan kelola X-API-Key untuk server lokal PhoBo',
+      title: 'Keamanan',
+      desc: 'Ubah password akun dan kelola API Key M2M server lokal PhoBo',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
     },
     {
       key: 'preferences',
       title: 'Preferensi Aplikasi',
-      desc: 'Atur asumsi laju inflasi tahunan untuk analisis portofolio',
+      desc: 'Atur asumsi laju inflasi tahunan untuk analisis portofolio investasi',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+      ),
     },
     {
       key: 'help',
-      title: 'Bantuan & Tentang Aplikasi',
+      title: 'Bantuan & Dukungan',
       desc: 'Panduan Zero-Based Budgeting, Cek Inflasi, dan integrasi M2M',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      key: 'about',
+      title: 'Tentang Aplikasi',
+      desc: 'Informasi versi FinMate, arsitektur sistem, dan filosofi UX',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
     },
   ];
 
@@ -396,10 +426,9 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Panel Kanan: Menu Pengaturan & Konten */}
+        {/* Panel Kanan: Menu Pengaturan (List 5 Item PDF) & Konten */}
         <div className="lg:col-span-8 space-y-5">
-          {/* Menu Tabs Horizontal / List */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100 overflow-hidden">
             {menuItems.map((item) => {
               const isSelected = activeSection === item.key;
               return (
@@ -407,22 +436,33 @@ const Settings = () => {
                   key={item.key}
                   type="button"
                   onClick={() => setActiveSection(item.key)}
-                  className={`text-left p-4 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                  className={`w-full text-left px-5 py-4 transition-colors flex items-center justify-between gap-4 ${
                     isSelected
-                      ? 'bg-white border-emerald ring-2 ring-emerald/15 shadow-sm'
-                      : 'bg-white border-gray-100 hover:border-gray-200 shadow-sm'
+                      ? 'bg-emerald/5 border-l-4 border-l-emerald'
+                      : 'hover:bg-bg-light/60 border-l-4 border-l-transparent'
                   }`}
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-navy">
-                      {item.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                      {item.desc}
-                    </p>
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                        isSelected
+                          ? 'bg-emerald text-white'
+                          : 'bg-bg-light text-navy/70'
+                      }`}
+                    >
+                      {item.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-navy">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                        {item.desc}
+                      </p>
+                    </div>
                   </div>
                   <span
-                    className={`text-sm font-bold ${
+                    className={`text-lg font-semibold shrink-0 ${
                       isSelected ? 'text-emerald' : 'text-gray-400'
                     }`}
                   >
@@ -806,16 +846,16 @@ const Settings = () => {
             </div>
           )}
 
-          {/* Section 4: Bantuan & Tentang Aplikasi */}
+          {/* Section 4: Bantuan & Dukungan */}
           {activeSection === 'help' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4 text-sm text-navy/85">
               <div>
                 <h3 className="text-base font-semibold text-navy">
-                  Tentang FinMate v0.2.0
+                  Bantuan & Dukungan
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
-                  Aplikasi manajemen keuangan personal & usaha mahasiswa berbasis
-                  FastAPI, PostgreSQL, dan React.
+                  Panduan penggunaan fitur inti FinMate untuk kebutuhan kuliah
+                  dan usaha mandiri.
                 </p>
               </div>
 
@@ -843,14 +883,61 @@ const Settings = () => {
                     Integrasi Otomatis Usaha PhoBo (M2M)
                   </p>
                   <p className="text-gray-600">
-                    Buat API Key pada menu Keamanan & API Key M2M lalu kirimkan
-                    POST request dengan header{' '}
-                    <code className="font-mono">X-API-Key</code> ke{' '}
+                    Buat API Key pada menu Keamanan lalu kirimkan POST request
+                    dengan header <code className="font-mono">X-API-Key</code>{' '}
+                    ke{' '}
                     <code className="font-mono">
                       /api/v1/transactions/auto-log
                     </code>
                     . Sistem akan mencatat pemasukan kategori{' '}
                     <em>Usaha PhoBo</em> secara otomatis ke akun bisnis Anda.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 5: Tentang Aplikasi */}
+          {activeSection === 'about' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4 text-sm text-navy/85">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-navy">
+                    Tentang FinMate
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Aplikasi Manajemen Keuangan Mahasiswa · Versi 0.2.0
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald/10 text-emerald">
+                  Production Ready
+                </span>
+              </div>
+
+              <p className="text-xs text-gray-600 leading-relaxed">
+                FinMate dirancang khusus untuk membantu mahasiswa mengelola arus
+                kas harian, memisahkan pembukuan usaha mandiri (Mode Bisnis),
+                merencanakan anggaran bulanan berbasis zero-based budgeting, dan
+                membandingkan pertumbuhan portofolio investasi terhadap inflasi.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-2">
+                <div className="p-3 rounded-lg bg-bg-light">
+                  <p className="text-gray-400 font-medium">Stack Backend</p>
+                  <p className="font-semibold text-navy mt-0.5">
+                    FastAPI + PostgreSQL
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-bg-light">
+                  <p className="text-gray-400 font-medium">Stack Frontend</p>
+                  <p className="font-semibold text-navy mt-0.5">
+                    React + Tailwind + Recharts
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-bg-light col-span-2 sm:col-span-1">
+                  <p className="text-gray-400 font-medium">Motto</p>
+                  <p className="font-semibold text-emerald mt-0.5">
+                    Kelola lebih cerdas
                   </p>
                 </div>
               </div>

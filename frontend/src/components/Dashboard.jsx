@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BarChart,
@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import api from '../services/api';
+import CategoryIcon from './CategoryIcon';
 
 const MONTH_NAMES = [
   '',
@@ -45,15 +46,24 @@ const formatCompact = (value) => {
 
 const Dashboard = () => {
   const [summary, setSummary] = useState(null);
+  const [businessStats, setBusinessStats] = useState({
+    income: 0,
+    expense: 0,
+    profit: 0,
+    txCount: 0,
+    accountCount: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   let displayName = 'Pengguna';
+  let storedUserId;
   try {
     const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
     if (storedUser?.username) {
       displayName = storedUser.username;
     }
+    storedUserId = storedUser?.id;
   } catch {
     // Fallback
   }
@@ -61,49 +71,112 @@ const Dashboard = () => {
   const savedInflation =
     Number(localStorage.getItem('finmate_inflation_rate')) || 3.2;
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await api.get('/dashboard/summary', {
+  const fetchSummary = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const now = new Date();
+      const [summaryRes, accountsRes, monthTxRes] = await Promise.all([
+        api.get('/dashboard/summary', {
           params: { inflation_rate: savedInflation },
-        });
-        setSummary(response.data);
-      } catch (err) {
-        setError(
-          err.response?.data?.detail ||
-            err.message ||
-            'Gagal mengambil data ringkasan dashboard'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+        }),
+        api.get('/accounts', {
+          params: storedUserId ? { user_id: storedUserId } : {},
+        }),
+        api.get('/transactions', {
+          params: {
+            month: now.getMonth() + 1,
+            year: now.getFullYear(),
+            limit: 500,
+          },
+        }),
+      ]);
 
+      setSummary(summaryRes.data);
+
+      const accounts = accountsRes.data ?? [];
+      const monthTxs = monthTxRes.data ?? [];
+      const businessAccIds = new Set(
+        accounts.filter((a) => a.is_business_account).map((a) => a.id)
+      );
+
+      let bizIncome = 0;
+      let bizExpense = 0;
+      let bizCount = 0;
+
+      for (const tx of monthTxs) {
+        const catLower = String(tx.category || '').toLowerCase();
+        const isBiz =
+          Boolean(tx.is_business) ||
+          businessAccIds.has(tx.account_id) ||
+          catLower.includes('usaha') ||
+          catLower.includes('phobo') ||
+          catLower.includes('proyek');
+
+        if (!isBiz) continue;
+        bizCount += 1;
+        const amt = Number(tx.amount || 0);
+        if (tx.type === 'Income') bizIncome += amt;
+        else if (tx.type === 'Expense') bizExpense += amt;
+      }
+
+      setBusinessStats({
+        income: bizIncome,
+        expense: bizExpense,
+        profit: bizIncome - bizExpense,
+        txCount: bizCount,
+        accountCount: businessAccIds.size,
+      });
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          err.message ||
+          'Gagal mengambil data ringkasan dashboard'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [savedInflation, storedUserId]);
+
+  useEffect(() => {
     fetchSummary();
-  }, [savedInflation]);
+  }, [fetchSummary]);
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse flex items-center gap-3">
+          <div className="w-3 h-3 rounded-full bg-emerald" />
+          <span className="text-sm font-medium text-navy">
+            Memuat data keuangan...
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {[...Array(4)].map((_, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-lg shadow-sm p-6 animate-pulse h-28"
+              className="bg-white rounded-xl shadow-sm p-6 animate-pulse h-28 border border-gray-100"
             />
           ))}
         </div>
-        <div className="text-sm text-navy/70">Memuat data dashboard...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg shadow-sm p-6">
-        Error: {error}
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p className="font-semibold text-sm">Gagal Memuat Dashboard</p>
+          <p className="text-xs mt-1">Error: {error}</p>
+        </div>
+        <button
+          type="button"
+          onClick={fetchSummary}
+          className="px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors self-start sm:self-auto"
+        >
+          Coba Lagi
+        </button>
       </div>
     );
   }
@@ -134,7 +207,7 @@ const Dashboard = () => {
             Halo, {displayName}!
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Semoga hari ini produktif — berikut ringkasan keuangan Anda
+            Semoga hari ini produktif!
           </p>
         </div>
         {summary?.period && (
@@ -144,12 +217,17 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* 4 Card Ringkasan Utama */}
+      {/* Baris 1: 4 Card Ringkasan Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-emerald text-white rounded-xl shadow-sm p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-white/80">
-            Total Aset
-          </p>
+        <div className="bg-gradient-to-br from-[#067F5B] to-[#056347] text-white rounded-xl shadow-sm p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/80">
+              Total Aset
+            </p>
+            <span className="text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+              {netRealGrowth >= 0 ? `↑ +${netRealGrowth}%` : `${netRealGrowth}%`}
+            </span>
+          </div>
           <p className="text-xl xl:text-2xl font-bold mt-2 tracking-tight">
             {formatCurrency(summary?.total_assets)}
           </p>
@@ -187,15 +265,12 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Baris Kedua: Pertumbuhan Bersih & Sisa Budget */}
+      {/* Baris 2: Pertumbuhan Bersih (Setelah Inflasi) & Sisa Budget Bulan Ini */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-navy">
               Pertumbuhan Bersih (Setelah Inflasi)
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Rata-rata return portofolio investasi dikurangi asumsi inflasi
             </p>
             <div className="flex items-baseline gap-2.5 mt-3">
               <span
@@ -206,16 +281,44 @@ const Dashboard = () => {
                 {netRealGrowth >= 0 ? `+${netRealGrowth}%` : `${netRealGrowth}%`}
               </span>
               <span className="text-xs font-medium text-gray-500">
-                vs inflasi {inflationRate}%/thn
+                vs Inflasi {inflationRate}%
               </span>
             </div>
+            <Link
+              to="/portfolio"
+              className="inline-block mt-3 text-xs font-semibold text-emerald hover:underline"
+            >
+              Cek Portofolio →
+            </Link>
           </div>
-          <Link
-            to="/portfolio"
-            className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald/10 text-emerald hover:bg-emerald/15 transition-colors shrink-0"
-          >
-            Cek Portofolio →
-          </Link>
+
+          {/* Mini Sparkline Visual matching FinMate PDF */}
+          <div className="shrink-0 flex flex-col items-end gap-2">
+            <svg
+              viewBox="0 0 96 42"
+              className="w-24 h-11 text-emerald"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M4 34 L26 24 L42 28 L66 13 L88 6"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M78 6 H88 V16"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="text-[11px] font-semibold text-emerald bg-emerald/10 px-2.5 py-0.5 rounded-full">
+              {netRealGrowth >= 0 ? 'Melampaui Inflasi' : 'Perlu Rebalancing'}
+            </span>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -240,12 +343,12 @@ const Dashboard = () => {
           </div>
           <div className="flex justify-between text-xs text-gray-500 mt-2">
             <span>Terpakai: {formatCurrency(expenses)}</span>
-            <span>Batas: {formatCurrency(budgetLimit)}</span>
+            <span>Total Anggaran: {formatCurrency(budgetLimit)}</span>
           </div>
         </div>
       </div>
 
-      {/* Baris Ketiga: Arus Kas Bulanan + Transaksi Terbaru */}
+      {/* Baris 3: Arus Kas Bulanan + Transaksi Terbaru */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-7 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4">
@@ -342,30 +445,20 @@ const Dashboard = () => {
                     className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                          isIncome
-                            ? 'bg-emerald/10 text-emerald'
-                            : isTransfer
-                              ? 'bg-blue-50 text-blue-600'
-                              : 'bg-red-50 text-red-600'
-                        }`}
-                      >
-                        {isIncome ? '↓' : isTransfer ? '⇄' : '↑'}
-                      </div>
+                      <CategoryIcon category={tx.category} type={tx.type} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="text-sm font-semibold text-navy truncate">
                             {tx.category}
                           </p>
                           {tx.is_business && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald/10 text-emerald font-medium">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald/10 text-emerald font-semibold">
                               Usaha
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-gray-400 truncate">
-                          {tx.account_name} · {tx.transaction_date}
+                          {tx.notes || tx.account_name} · {tx.transaction_date}
                         </p>
                       </div>
                     </div>
@@ -387,6 +480,58 @@ const Dashboard = () => {
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Baris 4: Mode Bisnis – Laba/Rugi Usaha Bulan Ini */}
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-navy">
+                Laba/Rugi Usaha Bulan Ini
+              </h2>
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald/10 text-emerald">
+                Mode Bisnis · PhoBo / Proyek
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Dihitung khusus dari mutasi akun bisnis ({businessStats.accountCount} akun) &
+              transaksi berlabel usaha ({businessStats.txCount} transaksi bulan ini)
+            </p>
+          </div>
+          <Link
+            to="/transactions?new=1"
+            className="text-xs font-semibold text-emerald hover:underline self-start sm:self-auto"
+          >
+            + Catat Transaksi Usaha →
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-bg-light">
+            <p className="text-xs font-medium text-gray-500">Pemasukan Usaha</p>
+            <p className="text-lg font-bold text-emerald mt-1">
+              {formatCurrency(businessStats.income)}
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-bg-light">
+            <p className="text-xs font-medium text-gray-500">Pengeluaran Usaha</p>
+            <p className="text-lg font-bold text-navy mt-1">
+              {formatCurrency(businessStats.expense)}
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-bg-light border border-emerald/20">
+            <p className="text-xs font-medium text-gray-500">Laba/Rugi Bersih</p>
+            <p
+              className={`text-lg font-bold mt-1 ${
+                businessStats.profit >= 0 ? 'text-emerald' : 'text-red-600'
+              }`}
+            >
+              {businessStats.profit >= 0 ? '+' : ''}
+              {formatCurrency(businessStats.profit)}
+            </p>
+          </div>
         </div>
       </div>
     </div>

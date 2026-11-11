@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -63,28 +63,28 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchReport = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await api.get('/reports/summary', {
-          params: { month: selectedMonth, year: selectedYear },
-        });
-        setReport(res.data);
-      } catch (err) {
-        setError(
-          err.response?.data?.detail ||
-            err.message ||
-            'Gagal memuat laporan keuangan'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReport();
+  const fetchReport = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get('/reports/summary', {
+        params: { month: selectedMonth, year: selectedYear },
+      });
+      setReport(res.data);
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          err.message ||
+          'Gagal memuat laporan keuangan'
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
 
   const totalIncome = report?.total_income ?? 0;
   const totalExpenses = report?.total_expenses ?? 0;
@@ -101,6 +101,27 @@ const Reports = () => {
   const selectedMonthName =
     MONTH_OPTIONS.find((m) => m.value === Number(selectedMonth))?.label || '';
 
+  const handleExportCsv = () => {
+    if (!report) return;
+    const rows = [
+      ['Laporan Keuangan FinMate', `${selectedMonthName} ${selectedYear}`],
+      ['Total Pemasukan', totalIncome],
+      ['Total Pengeluaran', totalExpenses],
+      ['Surplus / Defisit', netSavings],
+      [],
+      ['Kategori Pengeluaran', 'Jumlah (IDR)', 'Persentase (%)'],
+      ...expenseCategories.map((c) => [c.category, c.amount, c.percentage]),
+    ];
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `finmate-laporan-${selectedYear}-${selectedMonth}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Period Filter */}
@@ -113,7 +134,7 @@ const Reports = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -136,6 +157,15 @@ const Reports = () => {
             }
             className="w-24 px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-white text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30"
           />
+
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={!report || loading}
+            className="px-3.5 py-2 text-xs font-semibold border border-gray-200 bg-white text-navy rounded-lg hover:bg-bg-light transition-colors disabled:opacity-50"
+          >
+            Unduh CSV
+          </button>
         </div>
       </div>
 
@@ -163,13 +193,20 @@ const Reports = () => {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
-          Error: {error}
+        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-center justify-between gap-3">
+          <span>Error: {error}</span>
+          <button
+            type="button"
+            onClick={fetchReport}
+            className="px-3 py-1 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 shrink-0"
+          >
+            Coba Lagi
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm p-8 text-center text-sm text-gray-500">
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center text-sm text-gray-500 animate-pulse">
           Memuat data laporan {selectedMonthName} {selectedYear}...
         </div>
       ) : (

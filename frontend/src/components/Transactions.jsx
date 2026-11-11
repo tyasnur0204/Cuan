@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import CategoryIcon from './CategoryIcon';
 
 const MONTH_OPTIONS = [
   { value: '', label: 'Semua Bulan' },
@@ -16,6 +17,12 @@ const MONTH_OPTIONS = [
   { value: 10, label: 'Oktober' },
   { value: 11, label: 'November' },
   { value: 12, label: 'Desember' },
+];
+
+const TYPE_PILLS = [
+  { value: 'Expense', label: 'Pengeluaran' },
+  { value: 'Income', label: 'Pemasukan' },
+  { value: 'Transfer', label: 'Transfer' },
 ];
 
 const formatCurrency = (value) => {
@@ -142,7 +149,7 @@ const Transactions = () => {
       const payload = {
         amount: Number(formData.amount),
         type: formData.type,
-        category: formData.category,
+        category: formData.category.trim(),
         account_id: formData.account_id,
         transaction_date: formData.transaction_date,
         notes: formData.notes.trim() || null,
@@ -153,10 +160,7 @@ const Transactions = () => {
       }
 
       await api.post('/transactions', payload);
-      setFormData((prev) => ({
-        ...getInitialFormState(),
-        account_id: prev.account_id,
-      }));
+      setFormData(getInitialFormState());
       setSuccessMessage('Transaksi berhasil dicatat!');
 
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -210,7 +214,7 @@ const Transactions = () => {
         <button
           type="button"
           onClick={() => amountInputRef.current?.focus()}
-          className="px-4 py-2.5 bg-emerald text-white text-sm font-semibold rounded-lg hover:bg-emerald/90 transition-colors self-start sm:self-auto"
+          className="px-4 py-2.5 bg-emerald text-white text-sm font-semibold rounded-lg hover:bg-emerald/90 transition-colors self-start sm:self-auto shadow-sm"
         >
           + Tambah Transaksi
         </button>
@@ -245,7 +249,7 @@ const Transactions = () => {
           {successMessage && (
             <div
               role="alert"
-              className="p-3.5 bg-emerald/10 border border-emerald/20 text-emerald rounded-lg text-sm font-medium"
+              className="p-3.5 bg-green-50 border border-green-200 text-green-800 rounded-xl text-sm font-medium"
             >
               {successMessage}
             </div>
@@ -254,7 +258,7 @@ const Transactions = () => {
           {errorMessage && (
             <div
               role="alert"
-              className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium"
+              className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium"
             >
               Error: {errorMessage}
             </div>
@@ -278,21 +282,78 @@ const Transactions = () => {
               )}
             </div>
 
+            {/* Tipe Segmented Switch matching FinMate PDF */}
+            <div>
+              <label className="block text-xs font-medium text-navy mb-1.5">
+                Tipe
+              </label>
+              <div className="grid grid-cols-3 gap-1 p-1 bg-bg-light rounded-lg">
+                {TYPE_PILLS.map((pill) => (
+                  <button
+                    key={pill.value}
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, type: pill.value }))
+                    }
+                    className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      formData.type === pill.value
+                        ? 'bg-white text-emerald shadow-sm'
+                        : 'text-gray-500 hover:text-navy'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-navy mb-1">
-                Tipe Transaksi
+                Nominal (Rp)
               </label>
-              <select
-                name="type"
-                value={formData.type}
+              <input
+                ref={amountInputRef}
+                type="number"
+                name="amount"
+                value={formData.amount}
                 onChange={handleChange}
                 required
-                className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy bg-white focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
-              >
-                <option value="Expense">Pengeluaran (Expense)</option>
-                <option value="Income">Pemasukan (Income)</option>
-                <option value="Transfer">Transfer</option>
-              </select>
+                min="0.01"
+                step="any"
+                placeholder="100000"
+                className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-navy mb-1">
+                  Kategori
+                </label>
+                <input
+                  type="text"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  required
+                  placeholder="Makan & Minum"
+                  className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-navy mb-1">
+                  Tanggal
+                </label>
+                <input
+                  type="date"
+                  name="transaction_date"
+                  value={formData.transaction_date}
+                  onChange={handleChange}
+                  required
+                  className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
+                />
+              </div>
             </div>
 
             <div>
@@ -352,55 +413,6 @@ const Transactions = () => {
 
             <div>
               <label className="block text-xs font-medium text-navy mb-1">
-                Nominal (Rp)
-              </label>
-              <input
-                ref={amountInputRef}
-                type="number"
-                name="amount"
-                value={formData.amount}
-                onChange={handleChange}
-                required
-                min="0.01"
-                step="any"
-                placeholder="100000"
-                className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-navy mb-1">
-                  Kategori
-                </label>
-                <input
-                  type="text"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  required
-                  placeholder="Makan, Freelance"
-                  className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-navy mb-1">
-                  Tanggal
-                </label>
-                <input
-                  type="date"
-                  name="transaction_date"
-                  value={formData.transaction_date}
-                  onChange={handleChange}
-                  required
-                  className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-navy mb-1">
                 Catatan (Opsional)
               </label>
               <input
@@ -415,7 +427,7 @@ const Transactions = () => {
 
             <label className="flex items-center justify-between gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 bg-bg-light/60 hover:bg-bg-light transition-colors">
               <span className="text-xs font-medium text-navy">
-                Transaksi Usaha (PhoBo / Proyek)
+                Tandai sebagai Transaksi Usaha (PhoBo/Proyek)
               </span>
               <div className="relative inline-flex items-center shrink-0">
                 <input
@@ -432,7 +444,11 @@ const Transactions = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 bg-emerald text-white text-sm font-semibold rounded-lg hover:bg-emerald/90 transition-colors disabled:opacity-50"
+              className={`w-full py-2.5 px-4 bg-emerald text-white text-sm font-semibold rounded-lg transition-colors ${
+                isSubmitting
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-emerald/90'
+              }`}
             >
               {isSubmitting ? 'Menyimpan...' : 'Simpan Transaksi'}
             </button>
@@ -490,7 +506,7 @@ const Transactions = () => {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-sm text-gray-500">
+            <div className="p-8 text-center text-sm text-gray-500 animate-pulse">
               Memuat riwayat transaksi...
             </div>
           ) : transactions.length === 0 ? (
@@ -525,10 +541,15 @@ const Transactions = () => {
                             {tx.transaction_date}
                           </td>
                           <td className="p-3.5 font-medium text-navy">
-                            <div className="flex items-center gap-1.5">
-                              <span>{tx.category}</span>
+                            <div className="flex items-center gap-2.5">
+                              <CategoryIcon
+                                category={tx.category}
+                                type={tx.type}
+                                size="sm"
+                              />
+                              <span className="truncate">{tx.category}</span>
                               {tx.is_business && (
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald/10 text-emerald">
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald/10 text-emerald shrink-0">
                                   Usaha
                                 </span>
                               )}
@@ -562,7 +583,11 @@ const Transactions = () => {
                                     : 'bg-red-50 text-red-700'
                               }`}
                             >
-                              {tx.type}
+                              {isIncome
+                                ? 'Pemasukan'
+                                : isTransfer
+                                  ? 'Transfer'
+                                  : 'Pengeluaran'}
                             </span>
                           </td>
                           <td className="p-3.5 text-center">

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import FinMateLogo from './FinMateLogo';
 
 const navItems = [
   {
@@ -70,7 +72,7 @@ const navItems = [
   },
   {
     to: '/portfolio',
-    label: 'Portofolio',
+    label: 'Portofolio Investasi',
     shortLabel: 'Investasi',
     icon: (
       <svg
@@ -157,6 +159,9 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [storedUser, setStoredUser] = useState(getStoredUser);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const notifRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -167,6 +172,78 @@ const Layout = ({ children }) => {
       window.removeEventListener('finmate-user-updated', syncUser);
       window.removeEventListener('storage', syncUser);
     };
+  }, []);
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        const res = await api.get('/dashboard/summary');
+        const data = res.data;
+        const items = [];
+        if (data?.total_budget_limit > 0) {
+          const pct = Math.round(
+            (data.current_month_expenses / data.total_budget_limit) * 100
+          );
+          if (pct >= 100) {
+            items.push({
+              id: 'budget-over',
+              title: 'Anggaran Bulanan Terlampaui',
+              desc: `Pemakaian mencapai ${pct}% dari batas anggaran.`,
+              to: '/budgets',
+              tone: 'warn',
+            });
+          } else {
+            items.push({
+              id: 'budget-ok',
+              title: 'Status Anggaran Terkendali',
+              desc: `Terpakai ${pct}% dari anggaran bulan ini.`,
+              to: '/budgets',
+              tone: 'ok',
+            });
+          }
+        } else {
+          items.push({
+            id: 'budget-empty',
+            title: 'Atur Zero-Based Budgeting',
+            desc: 'Alokasikan anggaran bulanan agar arus kas lebih terukur.',
+            to: '/budgets',
+            tone: 'info',
+          });
+        }
+
+        if (data?.net_real_growth_pct !== undefined) {
+          items.push({
+            id: 'inv-check',
+            title:
+              data.net_real_growth_pct >= 0
+                ? 'Portofolio Kalahkan Inflasi'
+                : 'Return di Bawah Inflasi',
+            desc: `Pertumbuhan bersih ${
+              data.net_real_growth_pct >= 0
+                ? `+${data.net_real_growth_pct}%`
+                : `${data.net_real_growth_pct}%`
+            } vs inflasi ${data.inflation_rate_pct ?? 3.2}%.`,
+            to: '/portfolio',
+            tone: data.net_real_growth_pct >= 0 ? 'ok' : 'warn',
+          });
+        }
+        setAlerts(items);
+      } catch {
+        setAlerts([]);
+      }
+    };
+
+    loadNotifications();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const displayName = storedUser?.username || 'Pengguna FinMate';
@@ -187,8 +264,37 @@ const Layout = ({ children }) => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    const q = searchTerm.trim();
-    navigate(q ? `/transactions?search=${encodeURIComponent(q)}` : '/transactions');
+    const raw = searchTerm.trim();
+    const lower = raw.toLowerCase();
+
+    if (lower === 'dashboard' || lower === 'beranda') {
+      navigate('/dashboard');
+      return;
+    }
+    if (lower === 'budget' || lower === 'budgeting' || lower === 'anggaran') {
+      navigate('/budgets');
+      return;
+    }
+    if (
+      lower === 'investasi' ||
+      lower === 'portofolio' ||
+      lower === 'inflasi'
+    ) {
+      navigate('/portfolio');
+      return;
+    }
+    if (lower === 'laporan' || lower === 'report') {
+      navigate('/reports');
+      return;
+    }
+    if (lower === 'pengaturan' || lower === 'akun' || lower === 'settings') {
+      navigate('/settings');
+      return;
+    }
+
+    navigate(
+      raw ? `/transactions?search=${encodeURIComponent(raw)}` : '/transactions'
+    );
   };
 
   return (
@@ -203,24 +309,24 @@ const Layout = ({ children }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-emerald text-white flex flex-col shrink-0 transform transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-[#067F5B] via-[#06694B] to-[#044D37] text-white flex flex-col shrink-0 transform transition-transform duration-200 ease-in-out md:static md:translate-x-0 shadow-lg md:shadow-none ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="px-6 py-5 border-b border-white/15 flex items-center justify-between">
+        <div className="px-5 py-5 border-b border-white/15 flex items-center justify-between">
           <Link
             to="/dashboard"
-            className="flex items-center gap-3"
+            className="flex items-center gap-3 min-w-0"
             onClick={() => setSidebarOpen(false)}
           >
-            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center font-bold text-lg tracking-tight">
-              F
-            </div>
-            <div>
+            <FinMateLogo className="w-10 h-10" variant="glass" />
+            <div className="min-w-0">
               <h1 className="text-lg font-bold tracking-tight leading-none">
                 FinMate
               </h1>
-              <p className="text-xs text-white/75 mt-1">Manajemen Keuangan</p>
+              <p className="text-[11px] text-white/80 mt-1 truncate">
+                Keuangan Mahasiswa
+              </p>
             </div>
           </Link>
 
@@ -230,7 +336,12 @@ const Layout = ({ children }) => {
             onClick={() => setSidebarOpen(false)}
             aria-label="Tutup menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -241,27 +352,31 @@ const Layout = ({ children }) => {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+        <nav className="flex-1 px-3.5 py-5 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-white/20 text-white font-semibold shadow-sm'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white text-emerald font-semibold shadow-sm'
+                    : 'text-white/85 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
               {item.icon}
-              <span>{item.label}</span>
+              <span className="truncate">{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="px-4 py-4 border-t border-white/15 space-y-3">
+        <div className="px-4 py-4 border-t border-white/15 space-y-3 bg-black/10">
+          <div className="px-2 py-1 text-[11px] text-white/75 italic leading-snug">
+            “Kelola lebih cerdas, hidup lebih tenang.”
+          </div>
+
           <Link
             to="/settings"
             onClick={() => setSidebarOpen(false)}
@@ -272,8 +387,12 @@ const Layout = ({ children }) => {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">{displayName}</p>
-              {displayEmail && (
-                <p className="text-[11px] text-white/70 truncate">{displayEmail}</p>
+              {displayEmail ? (
+                <p className="text-[11px] text-white/70 truncate">
+                  {displayEmail}
+                </p>
+              ) : (
+                <p className="text-[11px] text-white/70">Mahasiswa</p>
               )}
             </div>
           </Link>
@@ -281,7 +400,7 @@ const Layout = ({ children }) => {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-white/85 hover:bg-white/10 hover:text-white transition-colors"
           >
             <svg
               className="w-5 h-5 shrink-0"
@@ -304,7 +423,7 @@ const Layout = ({ children }) => {
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white border-b border-gray-200/80 px-4 md:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-20">
+        <header className="bg-white border-b border-gray-200/80 px-4 md:px-8 py-3 flex items-center justify-between gap-4 sticky top-0 z-20">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <button
               type="button"
@@ -312,7 +431,12 @@ const Layout = ({ children }) => {
               onClick={() => setSidebarOpen(true)}
               aria-label="Buka menu"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -327,7 +451,7 @@ const Layout = ({ children }) => {
               className="relative w-full max-w-md hidden sm:block"
             >
               <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -343,19 +467,25 @@ const Layout = ({ children }) => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Cari transaksi, kategori..."
-                className="w-full pl-9 pr-4 py-2 text-sm bg-bg-light border border-gray-200/80 rounded-lg text-navy placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
+                placeholder="Cari fitur, transaksi..."
+                className="w-full pl-10 pr-4 py-2 text-sm bg-bg-light border border-gray-200/80 rounded-lg text-navy placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald/30 focus:border-emerald"
               />
             </form>
 
-            <div className="sm:hidden font-bold text-base text-navy truncate">
-              FinMate
+            <div className="sm:hidden flex items-center gap-2 font-bold text-base text-navy truncate">
+              <FinMateLogo className="w-7 h-7" variant="solid" />
+              <span>FinMate</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-light text-xs font-medium text-navy/80 border border-gray-200/60">
-              <svg className="w-3.5 h-3.5 text-emerald" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-3.5 h-3.5 text-emerald"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -366,9 +496,70 @@ const Layout = ({ children }) => {
               {formatTodayLabel()}
             </span>
 
+            {/* Notification Bell */}
+            <div className="relative" ref={notifRef}>
+              <button
+                type="button"
+                onClick={() => setNotifOpen((prev) => !prev)}
+                aria-label="Notifikasi Keuangan"
+                className="relative w-9 h-9 rounded-lg bg-bg-light border border-gray-200/70 text-navy hover:bg-gray-100 flex items-center justify-center transition-colors"
+              >
+                <svg
+                  className="w-4.5 h-4.5 w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                {alerts.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald" />
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-40 space-y-2">
+                  <div className="flex items-center justify-between px-1 pb-1 border-b border-gray-100">
+                    <span className="text-xs font-bold text-navy">
+                      Notifikasi FinMate
+                    </span>
+                    <span className="text-[11px] text-emerald font-semibold">
+                      {alerts.length} info
+                    </span>
+                  </div>
+                  {alerts.length === 0 ? (
+                    <p className="text-xs text-gray-500 px-1 py-2">
+                      Semua data keuangan Anda terpantau rapi.
+                    </p>
+                  ) : (
+                    alerts.map((a) => (
+                      <Link
+                        key={a.id}
+                        to={a.to}
+                        onClick={() => setNotifOpen(false)}
+                        className="block p-2.5 rounded-lg hover:bg-bg-light transition-colors"
+                      >
+                        <p className="text-xs font-semibold text-navy">
+                          {a.title}
+                        </p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {a.desc}
+                        </p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
             <Link
               to="/settings"
-              title="Pengaturan Akun"
+              title="Profil & Pengaturan Akun"
               className="w-9 h-9 rounded-full bg-emerald text-white flex items-center justify-center text-sm font-semibold hover:bg-emerald/90 transition-colors"
             >
               {initials || 'FM'}
@@ -413,7 +604,12 @@ const Layout = ({ children }) => {
           aria-label="Tambah Transaksi"
           className="-mt-6 w-12 h-12 rounded-full bg-emerald text-white flex items-center justify-center shadow-md border-4 border-bg-light hover:bg-emerald/90 transition-transform active:scale-95"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -436,15 +632,15 @@ const Layout = ({ children }) => {
         </NavLink>
 
         <NavLink
-          to="/reports"
+          to="/portfolio"
           className={({ isActive }) =>
             `flex flex-col items-center gap-0.5 px-2 py-1 text-[11px] font-medium ${
               isActive ? 'text-emerald' : 'text-gray-500'
             }`
           }
         >
-          {navItems[4].icon}
-          <span>{navItems[4].shortLabel}</span>
+          {navItems[3].icon}
+          <span>{navItems[3].shortLabel}</span>
         </NavLink>
       </nav>
     </div>

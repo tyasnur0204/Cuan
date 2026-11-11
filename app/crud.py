@@ -3,34 +3,42 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from passlib.context import CryptContext
-from sqlalchemy import extract, or_
+import bcrypt
+from sqlalchemy import extract, func, or_
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    if not hashed_password:
+    if not plain_password or not hashed_password:
         return False
-    return pwd_context.verify(plain_password, hashed_password)
+    plain_bytes = plain_password.encode("utf-8")[:72]
+    try:
+        return bcrypt.checkpw(plain_bytes, hashed_password.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    pw_bytes = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode("utf-8")
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
-    return db.query(models.User).filter(models.User.email == email).first()
+    normalized = email.strip().lower()
+    return (
+        db.query(models.User)
+        .filter(func.lower(models.User.email) == normalized)
+        .first()
+    )
 
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     hashed_password = get_password_hash(user.password)
     db_user = models.User(
-        username=user.username,
-        email=user.email,
+        username=user.username.strip(),
+        email=user.email.strip().lower(),
         hashed_password=hashed_password,
     )
     try:
