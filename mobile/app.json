@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FinMate",
-    "slug": "finmate",
+    "name": "CUAN",
+    "slug": "cuan",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,10 +13,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "id.finmate.app"
+      "bundleIdentifier": "id.cuan.app"
     },
     "android": {
-      "package": "id.finmate.app",
+      "package": "id.cuan.app",
       "adaptiveIcon": {
         "backgroundColor": "#067F5B",
         "foregroundImage": "./assets/android-icon-foreground.png",

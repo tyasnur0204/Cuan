@@ -40,8 +40,8 @@ if engine.dialect.name == "postgresql":
 # Application instance
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="FinMate – Aplikasi Manajemen Keuangan Mahasiswa",
-    description="Backend API untuk pencatatan transaksi, budgeting, laporan, dan pelacakan investasi.",
+    title="CUAN – Catat Uang, Aset Naik",
+    description="Backend API CUAN (Catat Uang, Aset Naik) untuk pencatatan transaksi, budgeting, laporan, dan pelacakan investasi.",
     version="0.2.0",
 )
 
@@ -943,7 +943,7 @@ def delete_api_key(
 
 @app.get("/api/v1/health", tags=["Health"])
 def health_check() -> dict:
-    return {"status": "ok", "service": "FinMate Web"}
+    return {"status": "ok", "service": "CUAN Web"}
 
 
 FRONTEND_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"

@@ -137,13 +137,13 @@ const LoginScreen = ({ onAuthenticated }) => {
             <View style={styles.brandRow}>
               <FinMateLogo size={46} variant="glass" />
               <View style={styles.brandTextWrap}>
-                <Text style={styles.brandTitle}>FinMate</Text>
-                <Text style={styles.brandSub}>Manajemen Keuangan Mahasiswa</Text>
+                <Text style={styles.brandTitle}>CUAN</Text>
+                <Text style={styles.brandSub}>Catat Uang, Aset Naik</Text>
               </View>
             </View>
 
             <Text style={styles.heroHeadline}>
-              Atur Keuanganmu, Raih Masa Depanmu!
+              Catat Uang, Aset Naik!
             </Text>
             <View style={styles.featureList}>
               {FEATURES.map((feat) => (

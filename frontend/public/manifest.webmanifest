@@ -1,7 +1,7 @@
 {
-  "name": "FinMate – Keuangan Mahasiswa",
-  "short_name": "FinMate",
-  "description": "Manajemen keuangan mahasiswa, budgeting, portofolio investasi, dan kas usaha.",
+  "name": "CUAN – Catat Uang, Aset Naik",
+  "short_name": "CUAN",
+  "description": "Catat Uang, Aset Naik — manajemen keuangan harian, budgeting, portofolio investasi, dan kas usaha.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

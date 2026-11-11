@@ -114,7 +114,7 @@ function MainApp() {
     );
   }
 
-  const initials = (user?.username || 'FM')
+  const initials = (user?.username || 'CU')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -132,8 +132,8 @@ function MainApp() {
         >
           <FinMateLogo size={34} variant="solid" />
           <View>
-            <Text style={styles.headerTitle}>FinMate</Text>
-            <Text style={styles.headerSub}>Keuangan Mahasiswa</Text>
+            <Text style={styles.headerTitle}>CUAN</Text>
+            <Text style={styles.headerSub}>Catat Uang, Aset Naik</Text>
           </View>
         </TouchableOpacity>
 
@@ -163,7 +163,7 @@ function MainApp() {
             ]}
             accessibilityLabel="Profil & Pengaturan"
           >
-            <Text style={styles.avatarBtnText}>{initials || 'FM'}</Text>
+            <Text style={styles.avatarBtnText}>{initials || 'CU'}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -35,7 +35,7 @@ const MobileAppModal = ({ open, onClose }) => {
   const handlePwaInstall = async () => {
     const res = await triggerPwaInstall();
     if (res?.outcome === 'accepted') {
-      setInstallFeedback('FinMate berhasil ditambahkan ke layar utama!');
+      setInstallFeedback('CUAN berhasil ditambahkan ke layar utama!');
     } else if (res?.outcome === 'unavailable') {
       setInstallFeedback(
         'Gunakan menu browser (Bagikan / ⋮) lalu pilih Tambah ke Layar Utama.'
@@ -49,7 +49,7 @@ const MobileAppModal = ({ open, onClose }) => {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="finmate-mobile-modal-title"
+      aria-labelledby="cuan-mobile-modal-title"
     >
       <div
         className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl border border-gray-100 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto"
@@ -62,17 +62,17 @@ const MobileAppModal = ({ open, onClose }) => {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2
-                  id="finmate-mobile-modal-title"
+                  id="cuan-mobile-modal-title"
                   className="text-base font-bold text-navy leading-tight"
                 >
-                  Aplikasi Mobile FinMate
+                  Aplikasi Mobile CUAN
                 </h2>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald/10 text-emerald">
                   {APP_VERSION_LABEL}
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                Akses keuangan lebih cepat langsung dari layar HP Anda
+                Catat Uang, Aset Naik — lebih praktis langsung dari layar HP
               </p>
             </div>
           </div>
@@ -114,7 +114,7 @@ const MobileAppModal = ({ open, onClose }) => {
 
           <a
             href={APK_DOWNLOAD_URL}
-            download="FinMate.apk"
+            download="CUAN.apk"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full py-3 px-4 rounded-xl bg-emerald text-white text-sm font-semibold hover:bg-emerald/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
@@ -132,17 +132,17 @@ const MobileAppModal = ({ open, onClose }) => {
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            <span>Download FinMate.apk (Android)</span>
+            <span>Download CUAN.apk (Android)</span>
           </a>
 
           <ol className="text-[11px] text-gray-600 space-y-1 pl-4 list-decimal">
             <li>Ketuk tombol Download dan pilih Tetap Unduh jika browser bertanya.</li>
-            <li>Buka file <code className="font-mono text-navy">FinMate.apk</code> yang selesai diunduh.</li>
-            <li>Pilih <strong>Pasang (Install)</strong>, lalu masuk dengan akun FinMate Anda.</li>
+            <li>Buka file <code className="font-mono text-navy">CUAN.apk</code> yang selesai diunduh.</li>
+            <li>Pilih <strong>Pasang (Install)</strong>, lalu masuk dengan akun CUAN Anda.</li>
           </ol>
 
           <div className="pt-1 flex items-center justify-between text-[11px]">
-            <span className="text-gray-500">Package: id.finmate.app</span>
+            <span className="text-gray-500">Package: id.cuan.app</span>
             <a
               href={APK_RELEASE_PAGE_URL}
               target="_blank"
@@ -162,7 +162,7 @@ const MobileAppModal = ({ open, onClose }) => {
                 Pasang Tanpa Unduh APK (Android & iPhone)
               </p>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                Tambahkan ikon FinMate langsung ke layar utama HP
+                Tambahkan ikon CUAN langsung ke layar utama HP
               </p>
             </div>
             {pwaState.isInstalled && (

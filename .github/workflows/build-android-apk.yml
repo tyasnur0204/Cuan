@@ -1,4 +1,4 @@
-name: Build FinMate Android APK
+name: Build CUAN Android APK
 
 on:
   push:
@@ -52,21 +52,21 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Stage FinMate APK
+      - name: Stage CUAN APK
         run: |
           mkdir -p release-assets
-          cp mobile/android/app/build/outputs/apk/release/app-release.apk release-assets/FinMate.apk
-          ls -lh release-assets/FinMate.apk
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk release-assets/CUAN.apk
+          ls -lh release-assets/CUAN.apk
 
       - name: Publish APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-latest
-          name: FinMate Android App (Latest)
+          tag_name: cuan-android-latest
+          name: CUAN Android App (Catat Uang, Aset Naik)
           body: |
-            Build APK Android untuk **FinMate** (React Native / Expo).
-            Download dan pasang `FinMate.apk` langsung di perangkat Android Anda.
-            Terhubung otomatis ke server produksi FinMate.
-          files: release-assets/FinMate.apk
+            Build APK Android untuk **CUAN (Catat Uang, Aset Naik)** (React Native / Expo).
+            Download dan pasang `CUAN.apk` langsung di perangkat Android Anda.
+            Terhubung otomatis ke server produksi CUAN.
+          files: release-assets/CUAN.apk
           make_latest: true
           fail_on_unmatched_files: true

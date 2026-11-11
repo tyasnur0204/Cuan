@@ -166,7 +166,7 @@ const Layout = ({ children }) => {
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [showMobileBanner, setShowMobileBanner] = useState(() => {
     try {
-      return !localStorage.getItem('finmate_hide_mobile_app_banner');
+      return !localStorage.getItem('cuan_hide_mobile_app_banner');
     } catch {
       return true;
     }
@@ -176,7 +176,7 @@ const Layout = ({ children }) => {
 
   const dismissMobileBanner = () => {
     try {
-      localStorage.setItem('finmate_hide_mobile_app_banner', '1');
+      localStorage.setItem('cuan_hide_mobile_app_banner', '1');
     } catch {
       // Ignore storage quota / private mode issues
     }
@@ -265,7 +265,7 @@ const Layout = ({ children }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const displayName = storedUser?.username || 'Pengguna FinMate';
+  const displayName = storedUser?.username || 'Pengguna CUAN';
   const displayEmail = storedUser?.email || '';
 
   const initials = displayName
@@ -341,10 +341,10 @@ const Layout = ({ children }) => {
             <FinMateLogo className="w-10 h-10" variant="glass" />
             <div className="min-w-0">
               <h1 className="text-lg font-bold tracking-tight leading-none">
-                FinMate
+                CUAN
               </h1>
               <p className="text-[11px] text-white/80 mt-1 truncate">
-                Keuangan Mahasiswa
+                Catat Uang, Aset Naik
               </p>
             </div>
           </Link>
@@ -393,7 +393,7 @@ const Layout = ({ children }) => {
 
         <div className="px-4 py-4 border-t border-white/15 space-y-3 bg-black/10">
           <div className="px-2 py-1 text-[11px] text-white/75 italic leading-snug">
-            “Kelola lebih cerdas, hidup lebih tenang.”
+            “Catat Uang, Aset Naik.”
           </div>
 
           <Link
@@ -402,7 +402,7 @@ const Layout = ({ children }) => {
             className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
           >
             <div className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center text-xs font-bold shrink-0">
-              {initials || 'FM'}
+              {initials || 'CU'}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">{displayName}</p>
@@ -517,7 +517,7 @@ const Layout = ({ children }) => {
 
             <div className="sm:hidden flex items-center gap-2 font-bold text-base text-navy truncate">
               <FinMateLogo className="w-7 h-7" variant="solid" />
-              <span>FinMate</span>
+              <span>CUAN</span>
             </div>
           </div>
 
@@ -591,7 +591,7 @@ const Layout = ({ children }) => {
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-40 space-y-2">
                   <div className="flex items-center justify-between px-1 pb-1 border-b border-gray-100">
                     <span className="text-xs font-bold text-navy">
-                      Notifikasi FinMate
+                      Notifikasi CUAN
                     </span>
                     <span className="text-[11px] text-emerald font-semibold">
                       {alerts.length} info
@@ -627,7 +627,7 @@ const Layout = ({ children }) => {
               title="Profil & Pengaturan Akun"
               className="w-9 h-9 rounded-full bg-emerald text-white flex items-center justify-center text-sm font-semibold hover:bg-emerald/90 transition-colors"
             >
-              {initials || 'FM'}
+              {initials || 'CU'}
             </Link>
           </div>
         </header>
@@ -643,17 +643,17 @@ const Layout = ({ children }) => {
               <FinMateLogo className="w-8 h-8" variant="glass" />
               <div className="min-w-0">
                 <p className="text-xs font-bold leading-tight truncate">
-                  FinMate App (Android)
+                  CUAN App (Android)
                 </p>
                 <p className="text-[10px] text-white/80 truncate">
-                  Unduh APK atau pasang di layar HP
+                  Catat Uang, Aset Naik · Unduh APK
                 </p>
               </div>
             </button>
             <div className="flex items-center gap-1.5 shrink-0">
               <a
                 href={APK_DOWNLOAD_URL}
-                download="FinMate.apk"
+                download="CUAN.apk"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-2.5 py-1.5 rounded-lg bg-white text-emerald text-[11px] font-bold shadow-sm hover:bg-white/95 transition-colors"

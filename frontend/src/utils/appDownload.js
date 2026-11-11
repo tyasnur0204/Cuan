@@ -1,5 +1,5 @@
 export const APK_DOWNLOAD_URL =
-  'https://github.com/tyasnur0204/Cuan/releases/latest/download/FinMate.apk';
+  'https://github.com/tyasnur0204/Cuan/releases/latest/download/CUAN.apk';
 
 export const APK_RELEASE_PAGE_URL =
   'https://github.com/tyasnur0204/Cuan/releases/latest';

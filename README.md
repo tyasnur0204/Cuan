@@ -1,6 +1,6 @@
-# FinMate — Aplikasi Manajemen Keuangan Mahasiswa
+# CUAN — Catat Uang, Aset Naik
 
-**FinMate** adalah aplikasi web manajemen keuangan personal dan usaha sampingan untuk mahasiswa (seperti proyek *freelance* maupun usaha mandiri). Aplikasi ini menggabungkan pencatatan arus kas harian, *zero-based budgeting*, laporan keuangan, analisis portofolio investasi terhadap laju inflasi tahunan, serta integrasi **Machine-to-Machine (M2M)** berbasis API Key untuk pencatatan pemasukan usaha secara otomatis.
+**CUAN** (*Catat Uang, Aset Naik*) adalah aplikasi web & mobile manajemen keuangan personal dan usaha sampingan untuk mahasiswa (seperti proyek *freelance* maupun usaha mandiri). Aplikasi ini menggabungkan pencatatan arus kas harian, *zero-based budgeting*, laporan keuangan, analisis portofolio investasi terhadap laju inflasi tahunan, serta integrasi **Machine-to-Machine (M2M)** berbasis API Key untuk pencatatan pemasukan usaha secara otomatis.
 
 ---
 

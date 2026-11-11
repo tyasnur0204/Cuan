@@ -116,7 +116,7 @@ const Settings = () => {
   const handlePwaInstall = async () => {
     const res = await triggerPwaInstall();
     if (res?.outcome === 'accepted') {
-      setPwaFeedback('Pintasan FinMate berhasil dipasang ke layar utama!');
+      setPwaFeedback('Pintasan CUAN berhasil dipasang ke layar utama!');
     } else if (res?.outcome === 'unavailable') {
       setPwaFeedback(
         'Gunakan menu browser (Bagikan di Safari atau ⋮ di Chrome) lalu pilih Tambah ke Layar Utama.'
@@ -337,7 +337,7 @@ const Settings = () => {
     {
       key: 'mobile',
       title: 'Aplikasi Mobile (APK)',
-      desc: 'Download FinMate Android APK atau pasang pintasan di layar HP',
+      desc: 'Download CUAN Android APK atau pasang pintasan di layar HP',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -347,7 +347,7 @@ const Settings = () => {
     {
       key: 'about',
       title: 'Tentang Aplikasi',
-      desc: 'Informasi versi FinMate, arsitektur sistem, dan filosofi UX',
+      desc: 'Informasi versi CUAN, arsitektur sistem, dan filosofi UX',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -382,7 +382,7 @@ const Settings = () => {
         {/* Card Profil Pengguna (Kiri) */}
         <div className="lg:col-span-4 bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center text-center">
           <div className="w-20 h-20 rounded-full bg-emerald/15 text-emerald flex items-center justify-center text-2xl font-bold mb-4">
-            {initials || 'FM'}
+            {initials || 'CU'}
           </div>
 
           {!editingProfile ? (
@@ -892,7 +892,7 @@ const Settings = () => {
                   Bantuan & Dukungan
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
-                  Panduan penggunaan fitur inti FinMate untuk kebutuhan kuliah
+                  Panduan penggunaan fitur inti CUAN untuk kebutuhan harian
                   dan usaha mandiri.
                 </p>
               </div>
@@ -941,10 +941,10 @@ const Settings = () => {
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <h3 className="text-base font-semibold text-navy">
-                    Download Aplikasi Mobile FinMate
+                    Download Aplikasi Mobile CUAN
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Gunakan FinMate langsung dari layar HP Android atau iPhone Anda
+                    Catat Uang, Aset Naik langsung dari layar HP Android atau iPhone Anda
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald/10 text-emerald">
@@ -955,17 +955,17 @@ const Settings = () => {
               <div className="rounded-xl bg-gradient-to-br from-[#067F5B]/10 via-emerald/5 to-bg-light border border-emerald/25 p-5 space-y-3">
                 <div>
                   <p className="text-sm font-bold text-navy">
-                    FinMate Android APK (React Native)
+                    CUAN Android APK (React Native)
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    Aplikasi mobile native dengan data yang otomatis tersinkron ke akun web FinMate Anda.
+                    Aplikasi mobile native dengan data yang otomatis tersinkron ke akun web CUAN Anda.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                   <a
                     href={APK_DOWNLOAD_URL}
-                    download="FinMate.apk"
+                    download="CUAN.apk"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald text-white text-sm font-semibold hover:bg-emerald/90 transition-colors shadow-sm"
@@ -983,7 +983,7 @@ const Settings = () => {
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                       />
                     </svg>
-                    <span>Download FinMate.apk</span>
+                    <span>Download CUAN.apk</span>
                   </a>
 
                   <a
@@ -997,9 +997,9 @@ const Settings = () => {
                 </div>
 
                 <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal pt-1">
-                  <li>Unduh file <code className="font-mono text-navy">FinMate.apk</code> di HP Android Anda.</li>
+                  <li>Unduh file <code className="font-mono text-navy">CUAN.apk</code> di HP Android Anda.</li>
                   <li>Ketuk file hasil unduhan dan pilih <strong>Pasang (Install)</strong>.</li>
-                  <li>Buka FinMate dan masuk menggunakan email yang sama seperti di versi web.</li>
+                  <li>Buka CUAN dan masuk menggunakan email yang sama seperti di versi web.</li>
                 </ol>
               </div>
 
@@ -1010,7 +1010,7 @@ const Settings = () => {
                       Alternatif Cepat: Pasang ke Layar Utama (Android & iPhone)
                     </p>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      Buka FinMate seperti aplikasi tanpa perlu mengunduh file APK
+                      Buka CUAN seperti aplikasi tanpa perlu mengunduh file APK
                     </p>
                   </div>
                   {pwaState.isInstalled && (
@@ -1050,10 +1050,10 @@ const Settings = () => {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-navy">
-                    Tentang FinMate
+                    Tentang CUAN
                   </h3>
                   <p className="text-xs text-gray-500 mt-1">
-                    Aplikasi Manajemen Keuangan Mahasiswa · Versi 0.2.0
+                    CUAN (Catat Uang, Aset Naik) · Versi 0.2.0
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald/10 text-emerald">
@@ -1062,7 +1062,7 @@ const Settings = () => {
               </div>
 
               <p className="text-xs text-gray-600 leading-relaxed">
-                FinMate dirancang khusus untuk membantu mahasiswa mengelola arus
+                CUAN (Catat Uang, Aset Naik) dirancang untuk membantu mengelola arus
                 kas harian, memisahkan pembukuan usaha mandiri (Mode Bisnis),
                 merencanakan anggaran bulanan berbasis zero-based budgeting, dan
                 membandingkan pertumbuhan portofolio investasi terhadap inflasi.

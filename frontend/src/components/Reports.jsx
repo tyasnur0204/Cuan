@@ -104,7 +104,7 @@ const Reports = () => {
   const handleExportCsv = () => {
     if (!report) return;
     const rows = [
-      ['Laporan Keuangan FinMate', `${selectedMonthName} ${selectedYear}`],
+      ['Laporan Keuangan CUAN (Catat Uang, Aset Naik)', `${selectedMonthName} ${selectedYear}`],
       ['Total Pemasukan', totalIncome],
       ['Total Pengeluaran', totalExpenses],
       ['Surplus / Defisit', netSavings],
@@ -117,7 +117,7 @@ const Reports = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `finmate-laporan-${selectedYear}-${selectedMonth}.csv`;
+    link.download = `cuan-laporan-${selectedYear}-${selectedMonth}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };

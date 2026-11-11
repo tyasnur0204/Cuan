@@ -115,17 +115,17 @@ const Login = () => {
               <FinMateLogo className="w-11 h-11" variant="glass" />
               <div>
                 <h1 className="text-xl font-bold tracking-tight leading-none">
-                  FinMate
+                  CUAN
                 </h1>
                 <p className="text-xs text-white/80 mt-1">
-                  Manajemen Keuangan Mahasiswa
+                  Catat Uang, Aset Naik
                 </p>
               </div>
             </div>
 
             <div className="space-y-2.5 pt-2">
               <h2 className="text-2xl font-bold leading-snug">
-                Atur Keuanganmu, Raih Masa Depanmu!
+                Catat Uang, Aset Naik!
               </h2>
               <p className="text-xs text-white/80 leading-relaxed">
                 Catat pemasukan & pengeluaran harian, kendalikan anggaran bulanan,
@@ -155,13 +155,13 @@ const Login = () => {
                   Tersedia Aplikasi Android (.apk)
                 </p>
                 <p className="text-[11px] text-white/80 mt-0.5 leading-snug">
-                  Download aplikasi mobile FinMate atau pasang di layar HP Anda
+                  Download aplikasi mobile CUAN atau pasang di layar HP Anda
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   href={APK_DOWNLOAD_URL}
-                  download="FinMate.apk"
+                  download="CUAN.apk"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-emerald text-xs font-bold hover:bg-white/95 transition-colors shadow-sm"

@@ -225,7 +225,7 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
   };
 
   const confirmLogout = () => {
-    Alert.alert('Keluar Akun', 'Anda yakin ingin keluar dari sesi FinMate?', [
+    Alert.alert('Keluar Akun', 'Anda yakin ingin keluar dari sesi CUAN?', [
       { text: 'Batal', style: 'cancel' },
       {
         text: 'Keluar',
@@ -235,7 +235,7 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
     ]);
   };
 
-  const initials = (user?.username || 'FM')
+  const initials = (user?.username || 'CU')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -529,11 +529,12 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
 
       {section === 'about' && (
         <View style={[styles.card, SHADOW]}>
-          <Text style={styles.cardTitle}>Tentang FinMate Mobile</Text>
+          <Text style={styles.cardTitle}>Tentang CUAN Mobile</Text>
           <Text style={styles.mutedDesc}>
-            FinMate Mobile App (React Native + Expo) terhubung langsung ke REST
-            API FastAPI & PostgreSQL untuk manajemen keuangan mahasiswa, Zero-Based
-            Budgeting, Mode Bisnis, dan analisis investasi vs inflasi.
+            CUAN (Catat Uang, Aset Naik) versi Mobile App (React Native + Expo)
+            terhubung langsung ke REST API FastAPI & PostgreSQL untuk manajemen
+            keuangan harian, Zero-Based Budgeting, Mode Bisnis, dan analisis
+            investasi vs inflasi.
           </Text>
           <Text style={styles.versionTag}>Versi Aplikasi: 1.0.0</Text>
         </View>
