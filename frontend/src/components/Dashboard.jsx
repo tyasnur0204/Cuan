@@ -110,7 +110,7 @@ const Dashboard = () => {
           Boolean(tx.is_business) ||
           businessAccIds.has(tx.account_id) ||
           catLower.includes('usaha') ||
-          catLower.includes('phobo') ||
+          catLower.includes('bisnis') ||
           catLower.includes('proyek');
 
         if (!isBiz) continue;
@@ -492,7 +492,7 @@ const Dashboard = () => {
                 Laba/Rugi Usaha Bulan Ini
               </h2>
               <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald/10 text-emerald">
-                Mode Bisnis · PhoBo / Proyek
+                Mode Bisnis · Usaha / Proyek
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">

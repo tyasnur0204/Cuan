@@ -207,7 +207,7 @@ const Transactions = () => {
         <div>
           <h1 className="text-2xl font-bold text-navy">Transaksi</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Catat arus kas harian, usaha PhoBo, dan transfer antar akun
+            Catat arus kas harian, transaksi usaha, dan transfer antar akun
           </p>
         </div>
 
@@ -427,7 +427,7 @@ const Transactions = () => {
 
             <label className="flex items-center justify-between gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 bg-bg-light/60 hover:bg-bg-light transition-colors">
               <span className="text-xs font-medium text-navy">
-                Tandai sebagai Transaksi Usaha (PhoBo/Proyek)
+                Tandai sebagai Transaksi Usaha / Bisnis
               </span>
               <div className="relative inline-flex items-center shrink-0">
                 <input

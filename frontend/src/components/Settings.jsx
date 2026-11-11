@@ -42,7 +42,7 @@ const Settings = () => {
     confirm_password: '',
   });
   const [apiKeys, setApiKeys] = useState([]);
-  const [newKeyName, setNewKeyName] = useState('PhoBo Local Server');
+  const [newKeyName, setNewKeyName] = useState('');
   const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
@@ -201,7 +201,7 @@ const Settings = () => {
       const res = await api.post('/api-keys', { name: newKeyName.trim() });
       setNewlyCreatedKey(res.data);
       setCopiedKey(false);
-      setNewKeyName('PhoBo Local Server');
+      setNewKeyName('');
       const keysRes = await api.get('/api-keys');
       setApiKeys(keysRes.data ?? []);
       notifySuccess(
@@ -268,7 +268,7 @@ const Settings = () => {
     {
       key: 'accounts',
       title: 'Akun Keuangan',
-      desc: 'Kelola dompet tunai, rekening bank, investasi & akun usaha PhoBo',
+      desc: 'Kelola dompet tunai, rekening bank, investasi & akun usaha',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -278,7 +278,7 @@ const Settings = () => {
     {
       key: 'security',
       title: 'Keamanan',
-      desc: 'Ubah password akun dan kelola API Key M2M server lokal PhoBo',
+      desc: 'Ubah password akun dan kelola API Key integrasi otomatis (M2M)',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -481,8 +481,7 @@ const Settings = () => {
                   Tambah Akun Keuangan
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Buat akun dompet tunai, bank, investasi, atau kas usaha
-                  photobooth
+                  Buat akun dompet tunai, bank, investasi, atau kas usaha mandiri
                 </p>
               </div>
 
@@ -501,7 +500,7 @@ const Settings = () => {
                     onChange={(e) =>
                       setAccountForm((p) => ({ ...p, name: e.target.value }))
                     }
-                    placeholder="Contoh: Bank BCA / Kas Usaha PhoBo"
+                    placeholder="Contoh: Bank BCA / Kas Usaha"
                     className="w-full p-2.5 text-sm border border-gray-200 rounded-lg text-navy"
                   />
                 </div>
@@ -541,7 +540,7 @@ const Settings = () => {
                 <div className="flex items-end">
                   <label className="w-full flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 bg-bg-light/60 cursor-pointer">
                     <span className="text-xs font-medium text-navy">
-                      Tandai Akun Usaha (PhoBo)
+                      Tandai Akun Usaha / Bisnis
                     </span>
                     <input
                       type="checkbox"
@@ -689,14 +688,14 @@ const Settings = () => {
                 </form>
               </div>
 
-              {/* API Key M2M PhoBo */}
+              {/* API Key Integrasi M2M */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
                 <div>
                   <h3 className="text-base font-semibold text-navy">
-                    API Key Integrasi M2M (PhoBo Local Server)
+                    API Key Integrasi M2M (Webhook)
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Kirim pemasukan otomatis dari server photobooth melalui
+                    Kirim pemasukan usaha otomatis dari sistem eksternal melalui
                     header <code className="font-mono">X-API-Key</code> ke{' '}
                     <code className="font-mono">
                       POST /api/v1/transactions/auto-log
@@ -710,7 +709,7 @@ const Settings = () => {
                     required
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
-                    placeholder="Nama client (misal: PhoBo Local Server)"
+                    placeholder="Nama client / aplikasi (misal: Sistem Kasir)"
                     className="flex-1 p-2.5 text-sm border border-gray-200 rounded-lg text-navy"
                   />
                   <button
@@ -880,7 +879,7 @@ const Settings = () => {
                 </div>
                 <div className="p-3.5 rounded-lg bg-bg-light space-y-1 sm:col-span-2">
                   <p className="font-semibold text-navy">
-                    Integrasi Otomatis Usaha PhoBo (M2M)
+                    Integrasi Otomatis Pemasukan Usaha (M2M)
                   </p>
                   <p className="text-gray-600">
                     Buat API Key pada menu Keamanan lalu kirimkan POST request
@@ -890,7 +889,7 @@ const Settings = () => {
                       /api/v1/transactions/auto-log
                     </code>
                     . Sistem akan mencatat pemasukan kategori{' '}
-                    <em>Usaha PhoBo</em> secara otomatis ke akun bisnis Anda.
+                    <em>Pemasukan Usaha</em> secara otomatis ke akun bisnis Anda.
                   </p>
                 </div>
               </div>

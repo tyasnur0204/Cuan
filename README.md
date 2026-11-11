@@ -1,6 +1,6 @@
 # FinMate — Aplikasi Manajemen Keuangan Mahasiswa
 
-**FinMate** adalah aplikasi web manajemen keuangan personal dan usaha sampingan untuk mahasiswa (seperti proyek *freelance* maupun operasional photobooth **PhoBo**). Aplikasi ini menggabungkan pencatatan arus kas harian, *zero-based budgeting*, laporan keuangan, analisis portofolio investasi terhadap laju inflasi tahunan, serta integrasi **Machine-to-Machine (M2M)** berbasis API Key untuk pencatatan pemasukan usaha secara otomatis.
+**FinMate** adalah aplikasi web manajemen keuangan personal dan usaha sampingan untuk mahasiswa (seperti proyek *freelance* maupun usaha mandiri). Aplikasi ini menggabungkan pencatatan arus kas harian, *zero-based budgeting*, laporan keuangan, analisis portofolio investasi terhadap laju inflasi tahunan, serta integrasi **Machine-to-Machine (M2M)** berbasis API Key untuk pencatatan pemasukan usaha secara otomatis.
 
 ---
 
@@ -14,7 +14,7 @@
 
 ### 2. Transaksi & Mode Usaha
 - Mendukung 3 tipe transaksi: **Income** (Pemasukan), **Expense** (Pengeluaran), dan **Transfer** antar akun (otomatis memperbarui saldo akun sumber & tujuan).
-- Mode transaksi usaha (`is_business`) untuk memisahkan arus kas bisnis PhoBo/freelance dari keuangan pribadi.
+- Mode transaksi usaha (`is_business`) untuk memisahkan arus kas bisnis/freelance dari keuangan pribadi.
 - Filter berdasarkan tipe, bulan, kategori, akun, pencarian kata kunci, paginasi tabel, dan hapus transaksi dengan pembalikan saldo otomatis.
 
 ### 3. Budgeting (*Zero-Based Budgeting*)
@@ -31,11 +31,11 @@
 - Tab **Ringkasan**, **Pengeluaran**, **Pemasukan**, dan **Perbandingan** per periode bulan/tahun.
 - Grafik rincian kategori pengeluaran & pemasukan serta tabel perbandingan arus kas 6 bulan terakhir.
 
-### 6. Pengaturan & Integrasi M2M PhoBo
+### 6. Pengaturan & Integrasi M2M
 - Manajemen **Profil Pengguna** dan pembaruan **Password**.
 - Pengelolaan **Akun Keuangan** (`Cash`, `Bank`, `Investment`, dan penanda `is_business_account`).
 - Pengaturan asumsi **Laju Inflasi Tahunan (%)** secara lokal (`localStorage`).
-- Pembuatan, aktivasi/nonaktif, dan penghapusan **API Key M2M (`X-API-Key`)** agar server lokal photobooth (**PhoBo Local Server**) dapat mengirim transaksi pemasukan otomatis tanpa login JWT.
+- Pembuatan, aktivasi/nonaktif, dan penghapusan **API Key M2M (`X-API-Key`)** agar aplikasi atau sistem eksternal dapat mengirim transaksi pemasukan otomatis tanpa login JWT.
 
 ---
 
@@ -45,7 +45,7 @@
 | :--- | :--- |
 | **Backend API** | Python 3.10+, FastAPI, Uvicorn, Pydantic |
 | **ORM & Database** | SQLAlchemy, PostgreSQL (`psycopg2`) |
-| **Keamanan** | JWT (`python-jose`), Hashing Bcrypt (`passlib`), M2M `X-API-Key` |
+| **Keamanan** | JWT (`python-jose`), Hashing Bcrypt (`bcrypt`), M2M `X-API-Key` |
 | **Frontend Web** | React 18, Vite 6, React Router DOM v6, Axios |
 | **UI & Visualisasi** | Tailwind CSS v3 (Emerald `#067F5B`, Navy `#142C4B`, Bg `#F4F7F5`, Font `Inter`), Recharts |
 | **Deployment** | Docker (`Dockerfile`), Render Blueprint (`render.yaml`) |
@@ -126,9 +126,9 @@ Dokumentasi interaktif tersedia di **`http://localhost:8000/docs`** (Swagger UI)
 - `GET /api/v1/investments/inflation-check` — Kalkulasi *net real return* dan alokasi kelas aset
 - `POST /api/v1/investments`, `DELETE /api/v1/investments/{asset_id}`
 
-### Integrasi M2M (PhoBo Local Server)
+### Integrasi M2M (Webhook Eksternal)
 - `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `PATCH /api/v1/api-keys/{key_id}/toggle`, `DELETE /api/v1/api-keys/{key_id}` *(Auth JWT)*
-- `POST /api/v1/transactions/auto-log` *(Auth Header `X-API-Key`)* — Mencatat pemasukan otomatis sebagai tipe `"Income"`, kategori `"Usaha PhoBo"`, dan akun bisnis (`is_business_account=True`).
+- `POST /api/v1/transactions/auto-log` *(Auth Header `X-API-Key`)* — Mencatat pemasukan otomatis sebagai tipe `"Income"`, kategori `"Pemasukan Usaha"`, dan akun bisnis (`is_business_account=True`).
 
 Contoh pemanggilan M2M:
 

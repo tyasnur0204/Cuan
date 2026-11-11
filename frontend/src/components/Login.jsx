@@ -6,7 +6,7 @@ import FinMateLogo from './FinMateLogo';
 const FEATURES = [
   'Zero-Based Budgeting',
   'Analisis Pertumbuhan Aset vs Inflasi',
-  'Multi-Akun & Mode Bisnis PhoBo',
+  'Multi-Akun & Mode Bisnis / Usaha',
   'Laporan Keuangan Interaktif',
 ];
 

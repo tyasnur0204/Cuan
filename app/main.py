@@ -375,7 +375,7 @@ def auto_log_transaction(
                 )
             account = models.Account(
                 user_id=user.id,
-                name="Kas Usaha PhoBo",
+                name="Kas Usaha",
                 type=models.AccountType.CASH,
                 balance=Decimal("0.00"),
                 is_business_account=True,
@@ -389,7 +389,7 @@ def auto_log_transaction(
         db_transaction = models.Transaction(
             account_id=account.id,
             type=models.TransactionType.INCOME,
-            category="Usaha PhoBo",
+            category="Pemasukan Usaha",
             amount=payload.nominal,
             transaction_date=payload.tanggal,
             notes=f"Auto-log M2M ({api_key.name})",
@@ -863,7 +863,7 @@ def reports_summary(
 
 
 # ---------------------------------------------------------------------------
-# M2M API Keys Management (for PhoBo Local Server)
+# M2M API Keys Management (Integrasi Eksternal)
 # ---------------------------------------------------------------------------
 
 

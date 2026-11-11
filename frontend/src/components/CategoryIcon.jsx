@@ -25,7 +25,7 @@ const getIconConfig = (category = '', type = '') => {
   if (
     cat.includes('freelance') ||
     cat.includes('usaha') ||
-    cat.includes('phobo') ||
+    cat.includes('bisnis') ||
     cat.includes('proyek') ||
     cat.includes('gaji') ||
     type === 'Income'
