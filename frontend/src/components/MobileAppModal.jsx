@@ -45,6 +45,9 @@ const MobileAppModal = ({ open, onClose }) => {
 
   const apkFilename = releaseInfo?.filename || 'CUAN.apk';
   const apkSizeLabel = releaseInfo?.size_mb ? `${releaseInfo.size_mb} MB` : null;
+  const apkVersionLabel = releaseInfo?.version
+    ? `v${releaseInfo.version} · Android APK`
+    : APP_VERSION_LABEL;
 
   const handlePwaInstall = async () => {
     const res = await triggerPwaInstall();
@@ -82,7 +85,7 @@ const MobileAppModal = ({ open, onClose }) => {
                   Aplikasi Mobile CUAN
                 </h2>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald/10 text-emerald">
-                  {APP_VERSION_LABEL}
+                  {apkVersionLabel}
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">

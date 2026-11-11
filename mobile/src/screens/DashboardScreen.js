@@ -43,7 +43,7 @@ const DashboardScreen = ({ user, onNavigate, refreshKey }) => {
 
       const [summaryRes, accountsRes, monthTxRes] = await Promise.all([
         api.get('/dashboard/summary', { params: { inflation_rate: inflationRate } }),
-        api.get('/accounts'),
+        api.get('/accounts', { params: user?.id ? { user_id: user.id } : undefined }),
         api.get('/transactions', { params: { month, year, limit: 500 } }),
       ]);
 
@@ -86,7 +86,7 @@ const DashboardScreen = ({ user, onNavigate, refreshKey }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadDashboard(false);

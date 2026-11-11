@@ -3,7 +3,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,7 +18,12 @@ import {
 import CategoryBadge from '../components/CategoryBadge';
 import api from '../services/api';
 import { COLORS, SHADOW } from '../theme/theme';
-import { extractApiError, formatCurrency, getTodayISO } from '../utils/format';
+import {
+  extractApiError,
+  formatCurrency,
+  getTodayISO,
+  parseNominalInput,
+} from '../utils/format';
 
 const QUICK_CATEGORIES = [
   'Makan & Minum',
@@ -29,6 +36,7 @@ const QUICK_CATEGORIES = [
 ];
 
 const TransactionsScreen = ({
+  user,
   openCreateModal = false,
   onClearCreateModal,
   onNavigate,
@@ -40,6 +48,7 @@ const TransactionsScreen = ({
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   // Modal Form state
@@ -55,7 +64,15 @@ const TransactionsScreen = ({
   const [isBusiness, setIsBusiness] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     if (openCreateModal) {
+      setTxDate(getTodayISO());
       setModalOpen(true);
       onClearCreateModal?.();
     }
@@ -69,18 +86,24 @@ const TransactionsScreen = ({
     try {
       const params = { limit: 200 };
       if (activeTab !== 'ALL') params.type = activeTab;
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
 
       const [txRes, accRes] = await Promise.all([
         api.get('/transactions', { params }),
-        api.get('/accounts'),
+        api.get('/accounts', {
+          params: user?.id ? { user_id: user.id } : undefined,
+        }),
       ]);
 
       setTransactions(txRes.data ?? []);
       const accList = accRes.data ?? [];
       setAccounts(accList);
-      if (accList.length > 0 && !accountId) {
-        setAccountId(accList[0].id);
+      if (accList.length > 0) {
+        setAccountId((prev) =>
+          prev && accList.some((a) => a.id === prev) ? prev : accList[0].id
+        );
+      } else {
+        setAccountId('');
       }
     } catch (err) {
       setErrorMsg(extractApiError(err, 'Gagal memuat daftar transaksi'));
@@ -88,7 +111,7 @@ const TransactionsScreen = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab, search, accountId]);
+  }, [activeTab, debouncedSearch, user?.id]);
 
   useEffect(() => {
     loadData(false);
@@ -100,13 +123,18 @@ const TransactionsScreen = ({
   }, {});
 
   const handleSaveTransaction = async () => {
-    const numAmount = Number(amount);
-    if (!numAmount || numAmount <= 0) {
+    const numAmount = parseNominalInput(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
       Alert.alert('Validasi', 'Masukkan nominal lebih besar dari 0.');
       return;
     }
     if (!category.trim()) {
       Alert.alert('Validasi', 'Kategori wajib diisi.');
+      return;
+    }
+    const cleanDate = txDate.trim() || getTodayISO();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+      Alert.alert('Validasi', 'Format tanggal harus YYYY-MM-DD (contoh: 2026-11-11).');
       return;
     }
     if (!accountId) {
@@ -124,7 +152,7 @@ const TransactionsScreen = ({
         type: formType,
         category: category.trim(),
         amount: numAmount,
-        transaction_date: txDate.trim() || getTodayISO(),
+        transaction_date: cleanDate,
         notes: notes.trim() || null,
         is_business: isBusiness,
       };
@@ -188,7 +216,10 @@ const TransactionsScreen = ({
             <Text style={styles.subtitle}>Arus kas, usaha & transfer antar akun</Text>
           </View>
           <TouchableOpacity
-            onPress={() => setModalOpen(true)}
+            onPress={() => {
+              setTxDate(getTodayISO());
+              setModalOpen(true);
+            }}
             style={styles.addBtn}
           >
             <Ionicons name="add" size={18} color="#FFFFFF" />
@@ -346,7 +377,10 @@ const TransactionsScreen = ({
         transparent
         onRequestClose={() => setModalOpen(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalBackdrop}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Tambah Transaksi</Text>
@@ -542,7 +576,7 @@ const TransactionsScreen = ({
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

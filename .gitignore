@@ -18,6 +18,8 @@ frontend/dist/
 mobile/node_modules/
 mobile/.expo/
 mobile/dist/
+mobile/dist-check/
+mobile/android/
 dist/
 npm-debug.log*
 

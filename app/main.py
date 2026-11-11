@@ -225,7 +225,7 @@ def create_user(
 )
 def list_users(
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ) -> list[schemas.UserResponse]:
     return crud.get_users(db=db, skip=skip, limit=limit)
@@ -240,13 +240,15 @@ def list_users(
 def create_account(
     account: schemas.AccountCreate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
 ) -> schemas.AccountResponse:
-    if account.user_id is None or crud.get_user(db=db, user_id=account.user_id) is None:
+    if account.user_id is not None and account.user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id {account.user_id} not found",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Anda tidak dapat membuat akun untuk pengguna lain",
         )
-    return crud.create_account(db=db, account=account)
+    scoped_account = account.model_copy(update={"user_id": current_user.id})
+    return crud.create_account(db=db, account=scoped_account)
 
 
 @app.get(
@@ -257,10 +259,16 @@ def create_account(
 def list_accounts(
     user_id: Optional[UUID] = Query(default=None),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
 ) -> list[schemas.AccountResponse]:
-    return crud.get_accounts(db=db, user_id=user_id, skip=skip, limit=limit)
+    if user_id is not None and user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses ke akun pengguna lain ditolak",
+        )
+    return crud.get_accounts(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 
 @app.delete(
@@ -298,7 +306,9 @@ def create_transaction(
     current_user: models.User = Depends(auth.get_current_user),
 ) -> schemas.TransactionResponse:
     try:
-        return crud.create_transaction(db=db, transaction=transaction)
+        return crud.create_transaction(
+            db=db, transaction=transaction, user_id=current_user.id
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
@@ -316,7 +326,7 @@ def list_transactions(
     category: Optional[str] = Query(default=None),
     search: Optional[str] = Query(default=None),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ) -> list[schemas.TransactionResponse]:
@@ -440,9 +450,8 @@ def create_budget(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ) -> schemas.BudgetResponse:
-    if budget.user_id is None:
-        budget = budget.model_copy(update={"user_id": current_user.id})
-    return crud.create_budget(db=db, budget=budget)
+    scoped = budget.model_copy(update={"user_id": current_user.id})
+    return crud.create_budget(db=db, budget=scoped)
 
 
 @app.get(
@@ -455,11 +464,11 @@ def list_budgets(
     month: Optional[int] = Query(default=None, ge=1, le=12),
     year: Optional[int] = Query(default=None, ge=2000, le=2100),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ) -> list[schemas.BudgetResponse]:
-    effective_user_id = user_id or current_user.id
+    effective_user_id = current_user.id
     return crud.get_budgets(
         db=db, user_id=effective_user_id, month=month, year=year, skip=skip, limit=limit
     )
@@ -503,7 +512,7 @@ def dashboard_summary(
     now = datetime.now(timezone.utc)
     target_month = month or now.month
     target_year = year or now.year
-    effective_user_id = user_id or current_user.id
+    effective_user_id = current_user.id
 
     accounts = crud.get_accounts(db=db, user_id=effective_user_id, limit=1000)
     account_name_map = {acc.id: acc.name for acc in accounts}
@@ -672,9 +681,8 @@ def create_investment_asset(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ) -> schemas.InvestmentAssetResponse:
-    if asset.user_id is None:
-        asset = asset.model_copy(update={"user_id": current_user.id})
-    return crud.create_investment_asset(db=db, asset=asset)
+    scoped = asset.model_copy(update={"user_id": current_user.id})
+    return crud.create_investment_asset(db=db, asset=scoped)
 
 
 @app.delete(
@@ -709,9 +717,11 @@ def inflation_check(
         description="Laju inflasi tahunan dalam persen (default: 3.2%)",
     ),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
 ) -> dict:
-    assets = crud.get_investment_assets(db=db, user_id=user_id, limit=1000)
-    accounts = crud.get_accounts(db=db, user_id=user_id, limit=1000)
+    effective_user_id = current_user.id
+    assets = crud.get_investment_assets(db=db, user_id=effective_user_id, limit=1000)
+    accounts = crud.get_accounts(db=db, user_id=effective_user_id, limit=1000)
     inv_accounts_balance = sum(
         Decimal(str(acc.balance))
         for acc in accounts
@@ -907,7 +917,7 @@ def reports_summary(
 )
 def list_saving_goals(
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ) -> list[schemas.SavingGoalResponse]:
@@ -1226,11 +1236,37 @@ def _probe_apk_asset(url: str, ssl_ctx: ssl.SSLContext) -> tuple[bool, Optional[
     return False, None
 
 
-def _resolve_latest_apk_asset() -> dict:
+_VERSION_MANIFEST_URL = (
+    "https://github.com/tyasnur0204/Cuan/releases/download/cuan-android-latest/cuan-version.json"
+)
+
+
+def _fetch_remote_release_manifest(ssl_ctx: ssl.SSLContext) -> Optional[dict]:
+    try:
+        req = urllib.request.Request(
+            _VERSION_MANIFEST_URL,
+            method="GET",
+            headers={
+                "User-Agent": "CUAN-Web-App/1.0",
+                "Cache-Control": "no-cache",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
+            if 200 <= resp.status < 300:
+                raw = resp.read(32768).decode("utf-8")
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict) and parsed.get("version"):
+                    return parsed
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_latest_apk_asset(force_refresh: bool = False) -> dict:
     now = time.monotonic()
     cached = _APK_RELEASE_CACHE.get("data")
-    if cached is not None:
-        ttl = 120.0 if (cached.get("available") and cached.get("filename") == "CUAN.apk") else 15.0
+    if cached is not None and not force_refresh:
+        ttl = 60.0 if (cached.get("available") and cached.get("filename") == "CUAN.apk") else 15.0
         if (now - _APK_RELEASE_CACHE.get("ts", 0.0)) < ttl:
             return cached
 
@@ -1241,6 +1277,11 @@ def _resolve_latest_apk_asset() -> dict:
         "size_bytes": None,
         "size_mb": None,
         "tag_name": "cuan-android-latest",
+        "version": "1.0.0",
+        "version_code": 1,
+        "sha256": None,
+        "built_at": None,
+        "release_notes": [],
         "download_url": _APK_CANDIDATES[1][2],
         "release_page_url": _APK_CANDIDATES[1][3],
     }
@@ -1248,12 +1289,37 @@ def _resolve_latest_apk_asset() -> dict:
     for filename, tag_name, url, page_url in _APK_CANDIDATES:
         ok, size_bytes = _probe_apk_asset(url, ssl_ctx)
         if ok:
+            manifest = (
+                _fetch_remote_release_manifest(ssl_ctx)
+                if tag_name == "cuan-android-latest"
+                else None
+            )
+            version_str = str((manifest or {}).get("version") or "1.0.0")
+            try:
+                version_code = int((manifest or {}).get("version_code") or 1)
+            except (TypeError, ValueError):
+                version_code = 1
+            manifest_size = (manifest or {}).get("size_bytes")
+            final_size = (
+                int(manifest_size)
+                if isinstance(manifest_size, (int, float)) and manifest_size > 1024
+                else size_bytes
+            )
+            notes = (manifest or {}).get("release_notes")
+            if not isinstance(notes, list):
+                notes = []
+
             resolved = {
                 "available": True,
                 "filename": filename,
-                "size_bytes": size_bytes,
-                "size_mb": round(size_bytes / (1024 * 1024), 1) if size_bytes else None,
+                "size_bytes": final_size,
+                "size_mb": round(final_size / (1024 * 1024), 1) if final_size else None,
                 "tag_name": tag_name,
+                "version": version_str,
+                "version_code": version_code,
+                "sha256": (manifest or {}).get("sha256"),
+                "built_at": (manifest or {}).get("built_at"),
+                "release_notes": [str(n) for n in notes[:8]],
                 "download_url": url,
                 "release_page_url": page_url,
             }
@@ -1265,13 +1331,20 @@ def _resolve_latest_apk_asset() -> dict:
 
 
 @app.get("/api/v1/app/release", tags=["Mobile App"])
-def get_mobile_app_release() -> dict:
-    info = _resolve_latest_apk_asset()
+def get_mobile_app_release(refresh: bool = Query(default=False)) -> dict:
+    info = _resolve_latest_apk_asset(force_refresh=refresh)
     return {
         "app_name": "CUAN",
         "tagline": "Catat Uang, Aset Naik",
         "available": info["available"],
         "filename": info["filename"],
+        "version": info["version"],
+        "latest_version": info["version"],
+        "version_code": info["version_code"],
+        "latest_version_code": info["version_code"],
+        "sha256": info["sha256"],
+        "built_at": info["built_at"],
+        "release_notes": info["release_notes"],
         "size_bytes": info["size_bytes"],
         "size_mb": info["size_mb"],
         "tag_name": info["tag_name"],

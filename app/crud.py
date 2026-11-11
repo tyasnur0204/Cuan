@@ -139,7 +139,7 @@ def delete_account(
 
 
 def create_transaction(
-    db: Session, transaction: schemas.TransactionCreate
+    db: Session, transaction: schemas.TransactionCreate, user_id: Optional[UUID] = None
 ) -> models.Transaction:
     try:
         account = (
@@ -148,8 +148,8 @@ def create_transaction(
             .with_for_update()
             .first()
         )
-        if account is None:
-            raise ValueError(f"Account with id {transaction.account_id} not found")
+        if account is None or (user_id is not None and account.user_id != user_id):
+            raise ValueError("Akun keuangan tidak ditemukan.")
 
         current_balance = Decimal(account.balance)
         amount = Decimal(transaction.amount)
@@ -170,10 +170,8 @@ def create_transaction(
                     .with_for_update()
                     .first()
                 )
-                if dest_account is None:
-                    raise ValueError(
-                        f"Destination account with id {transaction.destination_account_id} not found"
-                    )
+                if dest_account is None or (user_id is not None and dest_account.user_id != user_id):
+                    raise ValueError("Akun tujuan transfer tidak ditemukan.")
                 dest_account.balance = Decimal(dest_account.balance) + amount
 
         tx_data = transaction.model_dump(exclude={"destination_account_id"})

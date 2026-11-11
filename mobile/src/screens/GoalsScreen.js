@@ -3,7 +3,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,7 +17,12 @@ import {
 import CategoryBadge from '../components/CategoryBadge';
 import api from '../services/api';
 import { COLORS, SHADOW } from '../theme/theme';
-import { extractApiError, formatCurrency, getTodayISO } from '../utils/format';
+import {
+  extractApiError,
+  formatCurrency,
+  getTodayISO,
+  parseNominalInput,
+} from '../utils/format';
 
 const GOAL_CATEGORIES = [
   'Barang Impian',
@@ -43,7 +50,7 @@ const QUICK_NOMINALS = [
   { label: '+1 jt', val: 1000000 },
 ];
 
-const GoalsScreen = ({ onDataChanged }) => {
+const GoalsScreen = ({ user, onDataChanged }) => {
   const [goals, setGoals] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +82,12 @@ const GoalsScreen = ({ onDataChanged }) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [gRes, aRes] = await Promise.all([api.get('/goals'), api.get('/accounts')]);
+      const [gRes, aRes] = await Promise.all([
+        api.get('/goals'),
+        api.get('/accounts', {
+          params: user?.id ? { user_id: user.id } : undefined,
+        }),
+      ]);
       setGoals(gRes.data ?? []);
       setAccounts(aRes.data ?? []);
     } catch (err) {
@@ -84,17 +96,26 @@ const GoalsScreen = ({ onDataChanged }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadData(false);
   }, [loadData]);
 
   const handleCreateGoal = async () => {
-    const targetVal = Number(targetAmount);
-    const initVal = Number(initialAmount || 0);
-    if (!title.trim() || !targetVal || targetVal <= 0) {
+    const targetVal = parseNominalInput(targetAmount);
+    const initVal = initialAmount.trim() ? parseNominalInput(initialAmount) : 0;
+    if (!title.trim() || !Number.isFinite(targetVal) || targetVal <= 0) {
       Alert.alert('Validasi', 'Isi nama target dan nominal target (> 0).');
+      return;
+    }
+    if (!Number.isFinite(initVal) || initVal < 0) {
+      Alert.alert('Validasi', 'Setoran awal tidak valid.');
+      return;
+    }
+    const cleanDate = targetDate.trim();
+    if (cleanDate && !/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+      Alert.alert('Validasi', 'Format target tanggal harus YYYY-MM-DD (atau kosongkan).');
       return;
     }
     setSavingGoal(true);
@@ -104,7 +125,7 @@ const GoalsScreen = ({ onDataChanged }) => {
         category,
         target_amount: targetVal,
         initial_amount: initVal > 0 ? initVal : 0,
-        target_date: targetDate.trim() || null,
+        target_date: cleanDate || null,
         notes: notes.trim() || null,
       });
       setTitle('');
@@ -133,9 +154,13 @@ const GoalsScreen = ({ onDataChanged }) => {
 
   const handleContribute = async () => {
     if (!txGoal) return;
-    const amt = Number(txAmount);
-    if (!amt || amt <= 0) {
+    const amt = parseNominalInput(txAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
       Alert.alert('Validasi', 'Masukkan nominal (> 0).');
+      return;
+    }
+    if (txType === 'withdraw' && amt > Number(txGoal.saved_amount || 0)) {
+      Alert.alert('Validasi', 'Nominal penarikan melebihi saldo tabungan target ini.');
       return;
     }
     setTxSaving(true);
@@ -234,13 +259,17 @@ const GoalsScreen = ({ onDataChanged }) => {
   const historyGoal = goals.find((g) => g.id === historyGoalId) || null;
   const txCurrentSaved = Number(txGoal?.saved_amount || 0);
   const txTargetVal = Number(txGoal?.target_amount || 0);
-  const txDelta = Number(txAmount || 0);
+  const parsedTxDelta = txAmount ? parseNominalInput(txAmount) : 0;
+  const txDelta = Number.isFinite(parsedTxDelta) && parsedTxDelta > 0 ? parsedTxDelta : 0;
   const txPreviewSaved =
     txType === 'deposit'
-      ? txCurrentSaved + (Number.isFinite(txDelta) && txDelta > 0 ? txDelta : 0)
-      : Math.max(0, txCurrentSaved - (Number.isFinite(txDelta) && txDelta > 0 ? txDelta : 0));
-  const txPreviewPct =
-    txTargetVal > 0 ? Math.min(100, Math.round((txPreviewSaved / txTargetVal) * 100)) : 0;
+      ? txCurrentSaved + txDelta
+      : Math.max(0, txCurrentSaved - txDelta);
+  const rawTxPreviewPct =
+    txTargetVal > 0 ? Math.round((txPreviewSaved / txTargetVal) * 100) : 0;
+  const txPreviewPct = Number.isFinite(rawTxPreviewPct)
+    ? Math.min(100, Math.max(0, rawTxPreviewPct))
+    : 0;
 
   return (
     <View style={styles.container}>
@@ -480,9 +509,15 @@ const GoalsScreen = ({ onDataChanged }) => {
         transparent
         onRequestClose={() => setCreateOpen(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalBackdrop}
+        >
           <View style={styles.modalSheet}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Target Tabungan Baru</Text>
                 <TouchableOpacity onPress={() => setCreateOpen(false)}>
@@ -590,7 +625,7 @@ const GoalsScreen = ({ onDataChanged }) => {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal: Contribute / Withdraw */}
@@ -600,9 +635,15 @@ const GoalsScreen = ({ onDataChanged }) => {
         transparent
         onRequestClose={() => setTxGoal(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalBackdrop}
+        >
           <View style={styles.modalSheet}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle} numberOfLines={1}>
@@ -788,7 +829,7 @@ const GoalsScreen = ({ onDataChanged }) => {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal: History */}

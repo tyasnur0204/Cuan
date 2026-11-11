@@ -14,8 +14,13 @@ export const DONUT_COLORS = [
   '#EC4899',
 ];
 
+const safeNum = (val, fallback = 0) => {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : fallback;
+};
+
 export const CashflowBarChart = ({ data = [] }) => {
-  if (!data.length) {
+  if (!Array.isArray(data) || !data.length) {
     return (
       <View style={styles.emptyChart}>
         <Text style={styles.emptyText}>Belum ada data arus kas.</Text>
@@ -25,7 +30,10 @@ export const CashflowBarChart = ({ data = [] }) => {
 
   const maxVal = Math.max(
     1,
-    ...data.flatMap((d) => [Number(d.income || 0), Number(d.expense || 0)])
+    ...data.flatMap((d) => [
+      Math.max(0, safeNum(d?.income)),
+      Math.max(0, safeNum(d?.expense)),
+    ])
   );
   const width = 310;
   const height = 160;
@@ -53,18 +61,20 @@ export const CashflowBarChart = ({ data = [] }) => {
         })}
 
         {data.map((item, idx) => {
-          const incH = (Number(item.income || 0) / maxVal) * plotHeight;
-          const expH = (Number(item.expense || 0) / maxVal) * plotHeight;
+          const incVal = Math.max(0, safeNum(item?.income));
+          const expVal = Math.max(0, safeNum(item?.expense));
+          const incH = (incVal / maxVal) * plotHeight;
+          const expH = (expVal / maxVal) * plotHeight;
           const centerX = idx * groupW + groupW / 2;
           const barW = Math.min(14, groupW * 0.28);
 
           return (
-            <G key={`${item.label}-${idx}`}>
+            <G key={`${item?.label || idx}-${idx}`}>
               <Rect
                 x={centerX - barW - 2}
                 y={topPad + (plotHeight - incH)}
                 width={barW}
-                height={Math.max(incH, item.income > 0 ? 3 : 0)}
+                height={Math.max(incH, incVal > 0 ? 3 : 0)}
                 rx={3}
                 fill={COLORS.emerald}
               />
@@ -72,7 +82,7 @@ export const CashflowBarChart = ({ data = [] }) => {
                 x={centerX + 2}
                 y={topPad + (plotHeight - expH)}
                 width={barW}
-                height={Math.max(expH, item.expense > 0 ? 3 : 0)}
+                height={Math.max(expH, expVal > 0 ? 3 : 0)}
                 rx={3}
                 fill={COLORS.navy}
               />
@@ -84,7 +94,7 @@ export const CashflowBarChart = ({ data = [] }) => {
                 fill={COLORS.grayText}
                 textAnchor="middle"
               >
-                {item.label}
+                {String(item?.label || '')}
               </SvgText>
             </G>
           );
@@ -113,43 +123,56 @@ export const DonutChart = ({
   size = 168,
   strokeWidth = 24,
 }) => {
-  const total = segments.reduce((acc, s) => acc + Math.max(0, Number(s.value || 0)), 0);
-  const radius = (size - strokeWidth) / 2;
+  const safeSegments = Array.isArray(segments) ? segments : [];
+  const total = safeSegments.reduce(
+    (acc, s) => acc + Math.max(0, safeNum(s?.value)),
+    0
+  );
+  const safeSize = Math.max(40, safeNum(size, 168));
+  const safeStroke = Math.min(safeSize / 2 - 4, Math.max(2, safeNum(strokeWidth, 24)));
+  const radius = (safeSize - safeStroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const center = size / 2;
+  const center = safeSize / 2;
 
   let cumulative = 0;
 
   return (
     <View style={styles.donutWrap}>
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={size} height={size}>
-          <G rotation="-90" origin={`${center}, ${center}`}>
+      <View
+        style={{
+          width: safeSize,
+          height: safeSize,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Svg width={safeSize} height={safeSize}>
+          <G rotation={-90} originX={center} originY={center}>
             <Circle
               cx={center}
               cy={center}
               r={radius}
               stroke="#EAEFED"
-              strokeWidth={strokeWidth}
+              strokeWidth={safeStroke}
               fill="transparent"
             />
             {total > 0 &&
-              segments.map((seg, idx) => {
-                const val = Math.max(0, Number(seg.value || 0));
+              safeSegments.map((seg, idx) => {
+                const val = Math.max(0, safeNum(seg?.value));
                 if (val <= 0) return null;
                 const fraction = val / total;
-                const arcLen = circumference * fraction;
+                const arcLen = Math.max(0, circumference * fraction);
                 const dashOffset = -circumference * cumulative;
                 cumulative += fraction;
                 return (
                   <Circle
-                    key={`${seg.label}-${idx}`}
+                    key={`${seg?.label || idx}-${idx}`}
                     cx={center}
                     cy={center}
                     r={radius}
-                    stroke={seg.color || DONUT_COLORS[idx % DONUT_COLORS.length]}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={`${arcLen} ${circumference}`}
+                    stroke={seg?.color || DONUT_COLORS[idx % DONUT_COLORS.length]}
+                    strokeWidth={safeStroke}
+                    strokeDasharray={[arcLen, circumference]}
                     strokeDashoffset={dashOffset}
                     strokeLinecap="butt"
                     fill="transparent"

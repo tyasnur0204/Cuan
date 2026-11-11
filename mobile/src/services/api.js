@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   USER: 'finmate_user',
   INFLATION_RATE: 'finmate_inflation_rate',
   API_BASE_URL: 'finmate_api_base_url',
+  SNOOZED_UPDATE_VERSION: 'cuan_snoozed_update_version',
 };
 
 let authFailureHandler = null;
@@ -21,17 +22,31 @@ export const setOnUnauthorized = (handler) => {
 
 const api = axios.create({
   baseURL: DEFAULT_API_URL,
-  timeout: 15000,
+  timeout: 25000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+export const normalizeApiBaseUrl = (url) => {
+  const cleaned = String(url || '').trim().replace(/\/+$/, '');
+  if (!cleaned) return '';
+  if (!/^https?:\/\//i.test(cleaned)) {
+    return `https://${cleaned}`;
+  }
+  return cleaned;
+};
+
+export const getApiOrigin = () => {
+  const current = String(api.defaults.baseURL || DEFAULT_API_URL).replace(/\/+$/, '');
+  return current.replace(/\/api\/v1$/i, '');
+};
+
 export const initApiBaseUrl = async () => {
   try {
     const customUrl = await AsyncStorage.getItem(STORAGE_KEYS.API_BASE_URL);
     if (customUrl && customUrl.trim()) {
-      api.defaults.baseURL = customUrl.trim().replace(/\/+$/, '');
+      api.defaults.baseURL = normalizeApiBaseUrl(customUrl);
     } else {
       api.defaults.baseURL = DEFAULT_API_URL;
     }
@@ -42,11 +57,12 @@ export const initApiBaseUrl = async () => {
 };
 
 export const setCustomApiBaseUrl = async (url) => {
-  const cleaned = String(url || '').trim().replace(/\/+$/, '');
-  if (!cleaned) {
+  const raw = String(url || '').trim();
+  if (!raw) {
     await AsyncStorage.removeItem(STORAGE_KEYS.API_BASE_URL);
     api.defaults.baseURL = DEFAULT_API_URL;
   } else {
+    const cleaned = normalizeApiBaseUrl(raw);
     await AsyncStorage.setItem(STORAGE_KEYS.API_BASE_URL, cleaned);
     api.defaults.baseURL = cleaned;
   }

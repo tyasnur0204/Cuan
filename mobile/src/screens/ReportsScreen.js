@@ -231,7 +231,10 @@ const ReportsScreen = () => {
                             style={[
                               styles.progressFill,
                               {
-                                width: `${Math.min(100, item.percentage)}%`,
+                                width: `${Math.min(
+                                  100,
+                                  Math.max(0, Number(item?.percentage || 0))
+                                )}%`,
                                 backgroundColor:
                                   DONUT_COLORS[idx % DONUT_COLORS.length],
                               },

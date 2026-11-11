@@ -3,7 +3,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,9 +18,14 @@ import CategoryBadge from '../components/CategoryBadge';
 import { DONUT_COLORS, DonutChart } from '../components/SimpleCharts';
 import api from '../services/api';
 import { COLORS, SHADOW } from '../theme/theme';
-import { extractApiError, formatCurrency, MONTH_NAMES_ID } from '../utils/format';
+import {
+  extractApiError,
+  formatCurrency,
+  MONTH_NAMES_ID,
+  parseNominalInput,
+} from '../utils/format';
 
-const BudgetsScreen = ({ onDataChanged }) => {
+const BudgetsScreen = ({ user, onDataChanged }) => {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -37,8 +44,14 @@ const BudgetsScreen = ({ onDataChanged }) => {
     else setLoading(true);
     try {
       const [bRes, txRes] = await Promise.all([
-        api.get('/budgets', { params: { month, year } }),
-        api.get('/transactions', { params: { month, year, limit: 1000 } }),
+        api.get('/budgets', {
+          params: {
+            month,
+            year,
+            ...(user?.id ? { user_id: user.id } : {}),
+          },
+        }),
+        api.get('/transactions', { params: { month, year, limit: 500 } }),
       ]);
       setBudgets(bRes.data ?? []);
       setTransactions(txRes.data ?? []);
@@ -48,7 +61,7 @@ const BudgetsScreen = ({ onDataChanged }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [month, year]);
+  }, [month, year, user?.id]);
 
   useEffect(() => {
     loadBudgets(false);
@@ -102,8 +115,8 @@ const BudgetsScreen = ({ onDataChanged }) => {
   }
 
   const handleCreateBudget = async () => {
-    const val = Number(limitAmount);
-    if (!category.trim() || !val || val <= 0) {
+    const val = parseNominalInput(limitAmount);
+    if (!category.trim() || !Number.isFinite(val) || val <= 0) {
       Alert.alert('Validasi', 'Isi nama kategori dan batas anggaran (> 0).');
       return;
     }
@@ -114,6 +127,7 @@ const BudgetsScreen = ({ onDataChanged }) => {
         limit_amount: val,
         month,
         year,
+        ...(user?.id ? { user_id: user.id } : {}),
       });
       setCategory('');
       setLimitAmount('');
@@ -252,7 +266,8 @@ const BudgetsScreen = ({ onDataChanged }) => {
           budgets.map((b, idx) => {
             const limit = Number(b.limit_amount || 0);
             const spent = spentByCategory[String(b.category || '').toLowerCase()] || 0;
-            const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+            const rawPct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+            const pct = Number.isFinite(rawPct) ? Math.min(100, Math.max(0, rawPct)) : 0;
             const over = spent > limit;
             return (
               <View key={b.id} style={[styles.card, SHADOW]}>
@@ -320,7 +335,10 @@ const BudgetsScreen = ({ onDataChanged }) => {
         transparent
         onRequestClose={() => setModalOpen(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalBackdrop}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Tambah Pos Anggaran</Text>
@@ -329,38 +347,43 @@ const BudgetsScreen = ({ onDataChanged }) => {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.label}>Kategori</Text>
-            <TextInput
-              value={category}
-              onChangeText={setCategory}
-              placeholder="Contoh: Makan & Minum"
-              placeholderTextColor={COLORS.grayLight}
-              style={styles.input}
-            />
-
-            <Text style={styles.label}>Batas Anggaran (Rp)</Text>
-            <TextInput
-              value={limitAmount}
-              onChangeText={setLimitAmount}
-              placeholder="1000000"
-              placeholderTextColor={COLORS.grayLight}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <TouchableOpacity
-              onPress={handleCreateBudget}
-              disabled={saving}
-              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              {saving ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.saveBtnText}>Simpan Anggaran</Text>
-              )}
-            </TouchableOpacity>
+              <Text style={styles.label}>Kategori</Text>
+              <TextInput
+                value={category}
+                onChangeText={setCategory}
+                placeholder="Contoh: Makan & Minum"
+                placeholderTextColor={COLORS.grayLight}
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>Batas Anggaran (Rp)</Text>
+              <TextInput
+                value={limitAmount}
+                onChangeText={setLimitAmount}
+                placeholder="1000000"
+                placeholderTextColor={COLORS.grayLight}
+                keyboardType="numeric"
+                style={styles.input}
+              />
+
+              <TouchableOpacity
+                onPress={handleCreateBudget}
+                disabled={saving}
+                style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Simpan Anggaran</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -450,16 +473,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    gap: 10,
+    maxHeight: '88%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.navy },
-  label: { fontSize: 12, fontWeight: '700', color: COLORS.navy, marginTop: 6 },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.navy,
+    marginTop: 10,
+    marginBottom: 6,
+  },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,

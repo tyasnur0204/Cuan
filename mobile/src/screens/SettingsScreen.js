@@ -19,13 +19,33 @@ import api, {
   setCustomApiBaseUrl,
   STORAGE_KEYS,
 } from '../services/api';
+import {
+  getInstalledAppInfo,
+  openDownloadInBrowser,
+} from '../services/appUpdater';
 import { COLORS, SHADOW } from '../theme/theme';
-import { extractApiError, formatCurrency } from '../utils/format';
+import {
+  extractApiError,
+  formatCurrency,
+  parseNominalInput,
+  parsePercentInput,
+} from '../utils/format';
 
-const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
+const SettingsScreen = ({
+  user,
+  onUserUpdated,
+  onLogout,
+  onDataChanged,
+  updateInfo,
+  onCheckUpdate,
+  onOpenUpdateModal,
+}) => {
   const [section, setSection] = useState('accounts');
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatusText, setUpdateStatusText] = useState('');
+  const installedInfo = getInstalledAppInfo();
 
   // Profile
   const [editingProfile, setEditingProfile] = useState(false);
@@ -55,7 +75,9 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
     try {
       const [meRes, accRes, keyRes, savedInf] = await Promise.all([
         api.get('/me'),
-        api.get('/accounts'),
+        api.get('/accounts', {
+          params: user?.id ? { user_id: user.id } : undefined,
+        }),
         api.get('/api-keys'),
         AsyncStorage.getItem(STORAGE_KEYS.INFLATION_RATE),
       ]);
@@ -72,7 +94,7 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [onUserUpdated]);
+  }, [onUserUpdated, user?.id]);
 
   useEffect(() => {
     loadSettingsData(false);
@@ -105,13 +127,19 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
       Alert.alert('Validasi', 'Masukkan nama akun keuangan.');
       return;
     }
+    const initialBal = accBalance.trim() ? parseNominalInput(accBalance) : 0;
+    if (!Number.isFinite(initialBal)) {
+      Alert.alert('Validasi', 'Saldo awal harus berupa angka yang valid.');
+      return;
+    }
     setBusy(true);
     try {
       await api.post('/accounts', {
         name: accName.trim(),
         type: accType,
-        balance: Number(accBalance || 0),
+        balance: initialBal,
         is_business_account: accBiz,
+        ...(user?.id ? { user_id: user.id } : {}),
       });
       setAccName('');
       setAccBalance('0');
@@ -212,8 +240,8 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
   };
 
   const handleSavePrefs = async () => {
-    const val = Number(inflationRate);
-    if (Number.isNaN(val) || val < 0) {
+    const val = parsePercentInput(inflationRate);
+    if (!Number.isFinite(val) || val < 0) {
       Alert.alert('Validasi', 'Laju inflasi harus angka >= 0.');
       return;
     }
@@ -222,6 +250,36 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
     setServerUrl(savedUrl);
     onDataChanged?.();
     Alert.alert('Tersimpan', `Preferensi inflasi (${val}%) dan server API disimpan.`);
+  };
+
+  const handleResetDefaultServer = async () => {
+    const savedUrl = await setCustomApiBaseUrl('');
+    setServerUrl(savedUrl);
+    onDataChanged?.();
+    Alert.alert('Reset Berhasil', `Server API dikembalikan ke default: ${savedUrl}`);
+  };
+
+  const handleManualCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatusText('');
+    try {
+      const info = await onCheckUpdate?.({ interactive: true, forceRefresh: true });
+      if (!info) {
+        setUpdateStatusText(
+          'Gagal memeriksa pembaruan. Pastikan koneksi internet dan server CUAN aktif.'
+        );
+      } else if (info.hasUpdate) {
+        setUpdateStatusText(
+          `Tersedia CUAN v${info.latestVersion} (Build ${info.latestVersionCode}).`
+        );
+      } else {
+        setUpdateStatusText(
+          `Aplikasi Anda sudah versi terbaru (v${installedInfo.version}).`
+        );
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   const confirmLogout = () => {
@@ -246,6 +304,7 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -258,7 +317,7 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
       {/* Profile Card */}
       <View style={[styles.profileCard, SHADOW]}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials || 'FM'}</Text>
+          <Text style={styles.avatarText}>{initials || 'CU'}</Text>
         </View>
         {!editingProfile ? (
           <>
@@ -322,7 +381,10 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
           { key: 'accounts', label: 'Akun Keuangan' },
           { key: 'security', label: 'Keamanan & M2M' },
           { key: 'prefs', label: 'Preferensi' },
-          { key: 'about', label: 'Tentang' },
+          {
+            key: 'about',
+            label: updateInfo?.hasUpdate ? 'Update Tersedia •' : 'Tentang & Update',
+          },
         ].map((t) => (
           <TouchableOpacity
             key={t.key}
@@ -524,19 +586,105 @@ const SettingsScreen = ({ user, onUserUpdated, onLogout, onDataChanged }) => {
           <TouchableOpacity onPress={handleSavePrefs} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Simpan Preferensi</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleResetDefaultServer}
+            style={styles.secondaryOutlineBtn}
+          >
+            <Ionicons name="refresh-outline" size={16} color={COLORS.navy} />
+            <Text style={styles.secondaryOutlineText}>Reset ke Server Cloud Default</Text>
+          </TouchableOpacity>
         </View>
       )}
 
       {section === 'about' && (
         <View style={[styles.card, SHADOW]}>
-          <Text style={styles.cardTitle}>Tentang CUAN Mobile</Text>
+          <Text style={styles.cardTitle}>Tentang & Pembaruan Otomatis</Text>
           <Text style={styles.mutedDesc}>
-            CUAN (Catat Uang, Aset Naik) versi Mobile App (React Native + Expo)
-            terhubung langsung ke REST API FastAPI & PostgreSQL untuk manajemen
-            keuangan harian, Zero-Based Budgeting, Mode Bisnis, dan analisis
-            investasi vs inflasi.
+            CUAN (Catat Uang, Aset Naik) versi Mobile App terhubung langsung ke
+            cloud server untuk pencatatan transaksi, Zero-Based Budgeting,
+            Target Tabungan, Mode Bisnis, dan analisis investasi vs inflasi.
           </Text>
-          <Text style={styles.versionTag}>Versi Aplikasi: 1.0.0</Text>
+
+          <View style={styles.metaGrid}>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Versi Terpasang</Text>
+              <Text style={styles.versionTag}>
+                v{installedInfo.version} (Build {installedInfo.versionCode})
+              </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Mode Aplikasi</Text>
+              <Text style={styles.metaValue}>
+                {installedInfo.isStandaloneAndroid
+                  ? 'CUAN APK Android'
+                  : 'Expo Go Preview'}
+              </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Package ID</Text>
+              <Text style={styles.metaValue}>{installedInfo.appId}</Text>
+            </View>
+          </View>
+
+          {updateInfo?.hasUpdate && (
+            <View style={styles.updateHighlight}>
+              <View style={styles.updateHighlightHead}>
+                <Ionicons name="sparkles" size={16} color={COLORS.emeraldDark} />
+                <Text style={styles.updateHighlightTitle}>
+                  Pembaruan v{updateInfo.latestVersion} Tersedia
+                  {updateInfo.sizeMb ? ` (${updateInfo.sizeMb} MB)` : ''}
+                </Text>
+              </View>
+              {(updateInfo.releaseNotes ?? []).slice(0, 4).map((note, idx) => (
+                <Text key={idx} style={styles.updateNoteLine}>
+                  • {note}
+                </Text>
+              ))}
+              <TouchableOpacity
+                onPress={() => onOpenUpdateModal?.()}
+                style={styles.primaryBtn}
+              >
+                <Text style={styles.primaryBtnText}>Update Otomatis Sekarang</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={handleManualCheckUpdate}
+            disabled={checkingUpdate}
+            style={[styles.checkUpdateBtn, checkingUpdate && { opacity: 0.7 }]}
+          >
+            {checkingUpdate ? (
+              <ActivityIndicator color={COLORS.navy} size="small" />
+            ) : (
+              <>
+                <Ionicons name="cloud-download-outline" size={17} color={COLORS.navy} />
+                <Text style={styles.checkUpdateText}>Cek Pembaruan Aplikasi</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {!!updateStatusText && (
+            <View style={styles.statusBanner}>
+              <Text style={styles.statusBannerText}>{updateStatusText}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={() =>
+              openDownloadInBrowser(
+                updateInfo || {
+                  apkProxyUrl: `${PRODUCTION_API_URL.replace(/\/api\/v1$/, '')}/api/v1/app/download?proxy=1`,
+                }
+              )
+            }
+            style={styles.browserLinkWrap}
+          >
+            <Ionicons name="open-outline" size={14} color={COLORS.grayText} />
+            <Text style={styles.browserLinkText}>
+              Unduh Installer APK Terbaru via Browser
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -683,6 +831,84 @@ const styles = StyleSheet.create({
   },
   toggleText: { fontSize: 11, fontWeight: '700', color: COLORS.navy },
   versionTag: { fontSize: 12, fontWeight: '700', color: COLORS.emerald },
+  secondaryOutlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  secondaryOutlineText: { fontSize: 12, fontWeight: '700', color: COLORS.navy },
+  metaGrid: {
+    backgroundColor: COLORS.bg,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  metaLabel: { fontSize: 12, color: COLORS.grayText },
+  metaValue: { fontSize: 12, fontWeight: '700', color: COLORS.navy },
+  updateHighlight: {
+    backgroundColor: COLORS.emeraldLight,
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+  },
+  updateHighlightHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  updateHighlightTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.emeraldDark,
+  },
+  updateNoteLine: {
+    fontSize: 12,
+    color: COLORS.navy,
+    lineHeight: 17,
+  },
+  checkUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  checkUpdateText: { fontSize: 13, fontWeight: '700', color: COLORS.navy },
+  statusBanner: {
+    backgroundColor: COLORS.blueBg,
+    borderRadius: 10,
+    padding: 10,
+  },
+  statusBannerText: { fontSize: 12, fontWeight: '600', color: COLORS.navy },
+  browserLinkWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 4,
+  },
+  browserLinkText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.grayText,
+    textDecorationLine: 'underline',
+  },
 });
 
 export default SettingsScreen;

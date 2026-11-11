@@ -2,21 +2,20 @@
   "expo": {
     "name": "CUAN",
     "slug": "cuan",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#067F5B"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "id.cuan.app"
     },
     "android": {
       "package": "id.cuan.app",
+      "versionCode": 2,
+      "permissions": [
+        "REQUEST_INSTALL_PACKAGES"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#067F5B",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -26,6 +25,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#067F5B"
+        }
+      ]
+    ]
   }
 }

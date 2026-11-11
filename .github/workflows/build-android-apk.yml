@@ -52,21 +52,54 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Stage CUAN APK
+      - name: Stage CUAN APK & Release Manifest
+        id: stage_apk
         run: |
           mkdir -p release-assets
           cp mobile/android/app/build/outputs/apk/release/app-release.apk release-assets/CUAN.apk
-          ls -lh release-assets/CUAN.apk
+          node - <<'EOF'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const appCfg = JSON.parse(fs.readFileSync('mobile/app.json', 'utf8')).expo;
+          const apkBuf = fs.readFileSync('release-assets/CUAN.apk');
+          const sha256 = crypto.createHash('sha256').update(apkBuf).digest('hex');
+          const version = String(appCfg.version || '1.0.0');
+          const versionCode = Number(appCfg.android?.versionCode || 1);
+          const meta = {
+            app_name: appCfg.name || 'CUAN',
+            version,
+            version_code: versionCode,
+            tag_name: 'cuan-android-latest',
+            filename: 'CUAN.apk',
+            size_bytes: apkBuf.length,
+            sha256,
+            commit: (process.env.GITHUB_SHA || '').slice(0, 7),
+            built_at: new Date().toISOString(),
+            release_notes: [
+              'Perbaikan crash APK standalone (expo-font & splash screen)',
+              'Perbaikan error tambah/muat akun & sinkronisasi data antar pengguna',
+              'Fitur Target Tabungan untuk barang impian + isi tabungan fleksibel',
+              'Fitur Update Otomatis langsung dari dalam aplikasi Android',
+            ],
+          };
+          fs.writeFileSync('release-assets/cuan-version.json', JSON.stringify(meta, null, 2));
+          if (process.env.GITHUB_OUTPUT) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nversion_code=${versionCode}\nsha256=${sha256}\n`);
+          }
+          EOF
+          ls -lh release-assets/
 
       - name: Publish APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: cuan-android-latest
-          name: CUAN Android App (Catat Uang, Aset Naik)
+          name: CUAN Android App v${{ steps.stage_apk.outputs.version }}
           body: |
-            Build APK Android untuk **CUAN (Catat Uang, Aset Naik)** (React Native / Expo).
-            Download dan pasang `CUAN.apk` langsung di perangkat Android Anda.
-            Terhubung otomatis ke server produksi CUAN.
-          files: release-assets/CUAN.apk
+            Build APK Android **CUAN v${{ steps.stage_apk.outputs.version }} (Build ${{ steps.stage_apk.outputs.version_code }})** — Catat Uang, Aset Naik.
+            Download dan pasang `CUAN.apk` langsung di perangkat Android Anda, atau perbarui langsung lewat fitur Update Otomatis di dalam aplikasi.
+            SHA-256: `${{ steps.stage_apk.outputs.sha256 }}`
+          files: |
+            release-assets/CUAN.apk
+            release-assets/cuan-version.json
           make_latest: true
           fail_on_unmatched_files: true

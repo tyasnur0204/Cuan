@@ -960,7 +960,9 @@ const Settings = () => {
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald/10 text-emerald">
-                  {APP_VERSION_LABEL}
+                  {apkReleaseInfo?.version
+                    ? `v${apkReleaseInfo.version} · Android APK`
+                    : APP_VERSION_LABEL}
                 </span>
               </div>
 

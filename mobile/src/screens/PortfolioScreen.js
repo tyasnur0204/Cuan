@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,7 +18,13 @@ import {
 import { DONUT_COLORS, DonutChart } from '../components/SimpleCharts';
 import api, { STORAGE_KEYS } from '../services/api';
 import { COLORS, SHADOW } from '../theme/theme';
-import { extractApiError, formatCompactCurrency, formatCurrency } from '../utils/format';
+import {
+  extractApiError,
+  formatCompactCurrency,
+  formatCurrency,
+  parseNominalInput,
+  parsePercentInput,
+} from '../utils/format';
 
 const ASSET_CLASSES = ['RDPU', 'SBN', 'Saham'];
 
@@ -61,10 +69,14 @@ const PortfolioScreen = ({ user, onDataChanged }) => {
   }, [loadPortfolio]);
 
   const handleAddAsset = async () => {
-    const retVal = Number(annualReturn);
-    const invVal = Number(investedAmount || 0);
-    if (!assetName.trim() || Number.isNaN(retVal) || annualReturn.trim() === '') {
-      Alert.alert('Validasi', 'Isi nama aset dan return tahunan (%).');
+    const retVal = parsePercentInput(annualReturn);
+    const invVal = investedAmount.trim() ? parseNominalInput(investedAmount) : 0;
+    if (!assetName.trim() || !Number.isFinite(retVal) || annualReturn.trim() === '') {
+      Alert.alert('Validasi', 'Isi nama aset dan estimasi return tahunan (%).');
+      return;
+    }
+    if (!Number.isFinite(invVal) || invVal < 0) {
+      Alert.alert('Validasi', 'Nilai investasi harus angka >= 0.');
       return;
     }
 
@@ -217,10 +229,14 @@ const PortfolioScreen = ({ user, onDataChanged }) => {
           />
         ) : (
           assets.map((asset) => {
-            const ret = Number(asset.annual_return_rate_pct || 0);
-            const net = Number(asset.net_real_return_pct || 0);
-            const barW = Math.min(100, Math.max(6, Math.round((ret / maxRate) * 100)));
-            const infMark = Math.min(95, Math.round((inflationRate / maxRate) * 100));
+            const rawRet = Number(asset.annual_return_rate_pct || 0);
+            const rawNet = Number(asset.net_real_return_pct || 0);
+            const ret = Number.isFinite(rawRet) ? rawRet : 0;
+            const net = Number.isFinite(rawNet) ? rawNet : 0;
+            const rawBarW = maxRate > 0 ? Math.round((ret / maxRate) * 100) : 6;
+            const barW = Number.isFinite(rawBarW) ? Math.min(100, Math.max(6, rawBarW)) : 6;
+            const rawInf = maxRate > 0 ? Math.round((inflationRate / maxRate) * 100) : 0;
+            const infMark = Number.isFinite(rawInf) ? Math.min(95, Math.max(0, rawInf)) : 0;
 
             return (
               <View key={asset.asset_id} style={[styles.card, SHADOW]}>
@@ -298,7 +314,10 @@ const PortfolioScreen = ({ user, onDataChanged }) => {
         transparent
         onRequestClose={() => setModalOpen(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalBackdrop}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Tambah Aset Investasi</Text>
@@ -307,71 +326,76 @@ const PortfolioScreen = ({ user, onDataChanged }) => {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.label}>Nama Aset</Text>
-            <TextInput
-              value={assetName}
-              onChangeText={setAssetName}
-              placeholder="Contoh: Bibit RDPU / ORI025 / BBCA"
-              placeholderTextColor={COLORS.grayLight}
-              style={styles.input}
-            />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.label}>Nama Aset</Text>
+              <TextInput
+                value={assetName}
+                onChangeText={setAssetName}
+                placeholder="Contoh: Bibit RDPU / ORI025 / BBCA"
+                placeholderTextColor={COLORS.grayLight}
+                style={styles.input}
+              />
 
-            <Text style={styles.label}>Kelas Aset</Text>
-            <View style={styles.clsRow}>
-              {ASSET_CLASSES.map((cls) => (
-                <TouchableOpacity
-                  key={cls}
-                  onPress={() => setAssetClass(cls)}
-                  style={[
-                    styles.clsBtn,
-                    assetClass === cls && styles.clsBtnActive,
-                  ]}
-                >
-                  <Text
+              <Text style={styles.label}>Kelas Aset</Text>
+              <View style={styles.clsRow}>
+                {ASSET_CLASSES.map((cls) => (
+                  <TouchableOpacity
+                    key={cls}
+                    onPress={() => setAssetClass(cls)}
                     style={[
-                      styles.clsBtnText,
-                      assetClass === cls && styles.clsBtnTextActive,
+                      styles.clsBtn,
+                      assetClass === cls && styles.clsBtnActive,
                     ]}
                   >
-                    {cls}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      style={[
+                        styles.clsBtnText,
+                        assetClass === cls && styles.clsBtnTextActive,
+                      ]}
+                    >
+                      {cls}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={styles.label}>Nilai Investasi (Rp)</Text>
-            <TextInput
-              value={investedAmount}
-              onChangeText={setInvestedAmount}
-              placeholder="2500000"
-              placeholderTextColor={COLORS.grayLight}
-              keyboardType="numeric"
-              style={styles.input}
-            />
+              <Text style={styles.label}>Nilai Investasi (Rp)</Text>
+              <TextInput
+                value={investedAmount}
+                onChangeText={setInvestedAmount}
+                placeholder="2500000"
+                placeholderTextColor={COLORS.grayLight}
+                keyboardType="numeric"
+                style={styles.input}
+              />
 
-            <Text style={styles.label}>Estimasi Return Tahunan (%)</Text>
-            <TextInput
-              value={annualReturn}
-              onChangeText={setAnnualReturn}
-              placeholder="6.8"
-              placeholderTextColor={COLORS.grayLight}
-              keyboardType="decimal-pad"
-              style={styles.input}
-            />
+              <Text style={styles.label}>Estimasi Return Tahunan (%)</Text>
+              <TextInput
+                value={annualReturn}
+                onChangeText={setAnnualReturn}
+                placeholder="6.8"
+                placeholderTextColor={COLORS.grayLight}
+                keyboardType="decimal-pad"
+                style={styles.input}
+              />
 
-            <TouchableOpacity
-              onPress={handleAddAsset}
-              disabled={saving}
-              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-            >
-              {saving ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.saveBtnText}>Simpan Aset</Text>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleAddAsset}
+                disabled={saving}
+                style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Simpan Aset</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -479,16 +503,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    gap: 8,
+    maxHeight: '88%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.navy },
-  label: { fontSize: 12, fontWeight: '700', color: COLORS.navy, marginTop: 6 },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.navy,
+    marginTop: 10,
+    marginBottom: 6,
+  },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
