@@ -189,10 +189,10 @@ const DashboardScreen = ({ user, onNavigate, refreshKey }) => {
       <View style={styles.shortcutRow}>
         {[
           { key: 'transactions_new', label: 'Catat', icon: 'add-circle' },
+          { key: 'goals', label: 'Tabungan', icon: 'flag' },
           { key: 'budgets', label: 'Budget', icon: 'pie-chart' },
           { key: 'portfolio', label: 'Investasi', icon: 'trending-up' },
           { key: 'reports', label: 'Laporan', icon: 'document-text' },
-          { key: 'settings', label: 'Akun', icon: 'settings' },
         ].map((item) => (
           <TouchableOpacity
             key={item.key}
@@ -279,6 +279,70 @@ const DashboardScreen = ({ user, onNavigate, refreshKey }) => {
             </Text>
           </View>
         </View>
+      </View>
+
+      {/* Target Tabungan Impian Card */}
+      <View style={[styles.card, SHADOW]}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.cardTitle}>Target Tabungan Impian</Text>
+            <Text style={styles.mutedDesc}>
+              {(summary?.saving_goals_summary?.active_count ?? 0) > 0
+                ? `${summary.saving_goals_summary.active_count} aktif · ${formatCurrency(summary.saving_goals_summary.total_saved)}`
+                : 'Menabung untuk barang impian kapanpun'}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => onNavigate('goals')}>
+            <Text style={styles.cardAction}>
+              {(summary?.saving_goals_summary?.active_count ?? 0) > 0
+                ? 'Isi / Kelola →'
+                : '+ Buat Target →'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {(summary?.saving_goals_summary?.top_goals ?? []).length === 0 ? (
+          <Text style={styles.mutedDesc}>
+            Belum ada target tabungan aktif. Ketuk + Buat Target untuk mulai menabung membeli barang impian.
+          </Text>
+        ) : (
+          <View style={{ gap: 10 }}>
+            {summary.saving_goals_summary.top_goals.map((g) => (
+              <TouchableOpacity
+                key={g.id}
+                onPress={() => onNavigate('goals')}
+                style={{
+                  backgroundColor: COLORS.bg,
+                  borderRadius: 12,
+                  padding: 11,
+                  gap: 6,
+                }}
+              >
+                <View style={styles.txRow}>
+                  <CategoryBadge category={g.category} size={32} />
+                  <Text style={[styles.txCat, { flex: 1 }]} numberOfLines={1}>
+                    {g.title}
+                  </Text>
+                  <Text style={styles.cardAction}>{g.progress_pct}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${Math.min(100, Number(g.progress_pct || 0))}%`,
+                        backgroundColor: COLORS.emerald,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.txMeta}>
+                  {formatCurrency(g.saved_amount)} / {formatCurrency(g.target_amount)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* 6-Month Cashflow Chart */}

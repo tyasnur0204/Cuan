@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -150,3 +150,66 @@ class APIKeyResponse(BaseModel):
 
 class APIKeyCreateResponse(APIKeyResponse):
     raw_key: str
+
+
+class SavingContributionCreate(BaseModel):
+    type: Literal["deposit", "withdraw"] = "deposit"
+    amount: Decimal = Field(..., gt=Decimal("0"))
+    contribution_date: Optional[date] = None
+    account_id: Optional[UUID] = None
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class SavingContributionResponse(BaseModel):
+    id: UUID
+    goal_id: UUID
+    account_id: Optional[UUID] = None
+    account_name: Optional[str] = None
+    transaction_id: Optional[UUID] = None
+    type: str
+    amount: Decimal
+    contribution_date: date
+    notes: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SavingGoalCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=150)
+    category: str = Field(default="Barang Impian", min_length=1, max_length=80)
+    target_amount: Decimal = Field(..., gt=Decimal("0"))
+    initial_amount: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    account_id: Optional[UUID] = None
+    target_date: Optional[date] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class SavingGoalUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=150)
+    category: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    target_amount: Optional[Decimal] = Field(default=None, gt=Decimal("0"))
+    target_date: Optional[date] = None
+    clear_target_date: bool = False
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    is_purchased: Optional[bool] = None
+
+
+class SavingGoalResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    title: str
+    category: str
+    target_amount: Decimal
+    saved_amount: Decimal
+    target_date: Optional[date] = None
+    notes: Optional[str] = None
+    is_purchased: bool
+    progress_pct: float = 0.0
+    remaining_amount: Decimal = Decimal("0.00")
+    is_achieved: bool = False
+    created_at: datetime
+    updated_at: datetime
+    contributions: list[SavingContributionResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)

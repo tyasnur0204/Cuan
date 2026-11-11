@@ -197,6 +197,13 @@ const Dashboard = () => {
   const inflationRate = summary?.inflation_rate_pct ?? savedInflation;
   const cashflow = summary?.monthly_cashflow ?? [];
   const recentTxs = summary?.recent_transactions ?? [];
+  const goalsSummary = summary?.saving_goals_summary ?? {
+    total_saved: 0,
+    total_target: 0,
+    active_count: 0,
+    achieved_count: 0,
+    top_goals: [],
+  };
 
   return (
     <div className="space-y-6">
@@ -481,6 +488,83 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Baris Tambahan: Target Tabungan Impian */}
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-navy">
+                Target Tabungan Impian
+              </h2>
+              {goalsSummary.active_count > 0 && (
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald/10 text-emerald">
+                  {goalsSummary.active_count} Aktif · {formatCurrency(goalsSummary.total_saved)}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Menabung bertahap untuk membeli barang impian — bisa diisi kapan saja
+            </p>
+          </div>
+          <Link
+            to={goalsSummary.active_count === 0 ? '/goals?new=1' : '/goals'}
+            className="text-xs font-semibold text-emerald hover:underline self-start sm:self-auto"
+          >
+            {goalsSummary.active_count === 0
+              ? '+ Buat Target Tabungan →'
+              : 'Isi Tabungan / Kelola →'}
+          </Link>
+        </div>
+
+        {(goalsSummary.top_goals ?? []).length === 0 ? (
+          <div className="p-4 rounded-xl bg-bg-light border border-dashed border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-xs text-gray-600">
+              Belum ada target tabungan aktif. Contoh: menabung beli Laptop, HP baru, atau Dana Darurat.
+            </p>
+            <Link
+              to="/goals?new=1"
+              className="px-3.5 py-2 rounded-lg bg-emerald text-white text-xs font-semibold hover:bg-emerald/90 transition-colors shrink-0 self-start sm:self-auto"
+            >
+              + Mulai Menabung
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {goalsSummary.top_goals.map((g) => (
+              <Link
+                key={g.id}
+                to="/goals"
+                className="p-4 rounded-xl bg-bg-light hover:bg-emerald/5 border border-gray-200/70 transition-colors space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CategoryIcon category={g.category} size="sm" />
+                    <span className="text-sm font-bold text-navy truncate">
+                      {g.title}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald shrink-0">
+                    {g.progress_pct}%
+                  </span>
+                </div>
+                <div className="w-full bg-white rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-2 bg-emerald rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, g.progress_pct)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-gray-500">
+                  <span className="font-semibold text-navy">
+                    {formatCurrency(g.saved_amount)}
+                  </span>
+                  <span>/ {formatCurrency(g.target_amount)}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Baris 4: Mode Bisnis – Laba/Rugi Usaha Bulan Ini */}

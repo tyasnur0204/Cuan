@@ -19,7 +19,16 @@ const getIconConfig = (category = '', type = '') => {
   if (cat.includes('invest') || cat.includes('reksa') || cat.includes('sbn') || cat.includes('saham')) {
     return { bg: 'bg-emerald/10 text-emerald', kind: 'invest' };
   }
-  if (cat.includes('tabung') || cat.includes('saving')) {
+  if (
+    cat.includes('tabung') ||
+    cat.includes('saving') ||
+    cat.includes('impian') ||
+    cat.includes('darurat') ||
+    cat.includes('elektronik') ||
+    cat.includes('kendaraan') ||
+    cat.includes('liburan') ||
+    cat.includes('rumah')
+  ) {
     return { bg: 'bg-teal-50 text-teal-600', kind: 'savings' };
   }
   if (

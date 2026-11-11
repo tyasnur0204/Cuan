@@ -14,6 +14,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import FinMateLogo from './src/components/FinMateLogo';
 import BudgetsScreen from './src/screens/BudgetsScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import GoalsScreen from './src/screens/GoalsScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import PortfolioScreen from './src/screens/PortfolioScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
@@ -139,6 +140,23 @@ function MainApp() {
 
         <View style={styles.headerActions}>
           <TouchableOpacity
+            onPress={() => setActiveRoute('goals')}
+            style={[
+              styles.headerIconBtn,
+              activeRoute === 'goals' && styles.headerIconActive,
+            ]}
+            accessibilityLabel="Target Tabungan"
+          >
+            <Ionicons
+              name={activeRoute === 'goals' ? 'flag' : 'flag-outline'}
+              size={19}
+              color={
+                activeRoute === 'goals' ? COLORS.emerald : COLORS.navy
+              }
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
             onPress={() => setActiveRoute('reports')}
             style={[
               styles.headerIconBtn,
@@ -187,6 +205,9 @@ function MainApp() {
         )}
         {activeRoute === 'budgets' && (
           <BudgetsScreen onDataChanged={bumpRefresh} />
+        )}
+        {activeRoute === 'goals' && (
+          <GoalsScreen onDataChanged={bumpRefresh} />
         )}
         {activeRoute === 'portfolio' && (
           <PortfolioScreen user={user} onDataChanged={bumpRefresh} />

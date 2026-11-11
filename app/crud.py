@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 import secrets
 from decimal import Decimal
 from typing import Optional
@@ -5,7 +6,7 @@ from uuid import UUID
 
 import bcrypt
 from sqlalchemy import extract, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
 
@@ -422,6 +423,389 @@ def delete_api_key(db: Session, key_id: UUID) -> bool:
         return False
     try:
         db.delete(key_obj)
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Saving Goals (Target Tabungan / Celengan Impian)
+# ---------------------------------------------------------------------------
+
+
+def _today_wib() -> date:
+    return (datetime.now(timezone.utc) + timedelta(hours=7)).date()
+
+
+def to_saving_goal_response(goal: models.SavingGoal) -> schemas.SavingGoalResponse:
+    target = Decimal(str(goal.target_amount or 0))
+    saved = Decimal(str(goal.saved_amount or 0))
+    remaining = max(Decimal("0.00"), target - saved)
+    progress = (
+        min(100.0, round(float((saved / target) * Decimal("100")), 1))
+        if target > Decimal("0")
+        else 0.0
+    )
+    contribs = [
+        schemas.SavingContributionResponse(
+            id=c.id,
+            goal_id=c.goal_id,
+            account_id=c.account_id,
+            account_name=c.account.name if c.account is not None else None,
+            transaction_id=c.transaction_id,
+            type=c.type,
+            amount=c.amount,
+            contribution_date=c.contribution_date,
+            notes=c.notes,
+            created_at=c.created_at,
+        )
+        for c in (goal.contributions or [])
+    ]
+    return schemas.SavingGoalResponse(
+        id=goal.id,
+        user_id=goal.user_id,
+        title=goal.title,
+        category=goal.category,
+        target_amount=target,
+        saved_amount=saved,
+        target_date=goal.target_date,
+        notes=goal.notes,
+        is_purchased=bool(goal.is_purchased),
+        progress_pct=progress,
+        remaining_amount=remaining,
+        is_achieved=saved >= target and target > Decimal("0"),
+        created_at=goal.created_at,
+        updated_at=goal.updated_at,
+        contributions=contribs,
+    )
+
+
+def _apply_goal_contribution(
+    db: Session,
+    goal: models.SavingGoal,
+    user_id: UUID,
+    contrib_type: str,
+    amount: Decimal,
+    contribution_date: date,
+    account_id: Optional[UUID] = None,
+    notes: Optional[str] = None,
+) -> models.SavingContribution:
+    amt = Decimal(amount)
+    current_saved = Decimal(goal.saved_amount or 0)
+
+    if contrib_type == "withdraw":
+        if amt > current_saved:
+            raise ValueError(
+                "Saldo tabungan target tidak mencukupi untuk penarikan ini."
+            )
+        goal.saved_amount = current_saved - amt
+    else:
+        goal.saved_amount = current_saved + amt
+
+    linked_tx_id = None
+    linked_account_id = None
+    clean_notes = notes.strip() if notes and notes.strip() else None
+
+    if account_id is not None:
+        account = (
+            db.query(models.Account)
+            .filter(
+                models.Account.id == account_id,
+                models.Account.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if account is None:
+            raise ValueError("Akun sumber dana tidak ditemukan.")
+
+        if contrib_type == "withdraw":
+            account.balance = Decimal(account.balance) + amt
+            tx_note = f"Tarik Tabungan: {goal.title}" + (
+                f" ({clean_notes})" if clean_notes else ""
+            )
+        else:
+            account.balance = Decimal(account.balance) - amt
+            tx_note = f"Nabung: {goal.title}" + (
+                f" ({clean_notes})" if clean_notes else ""
+            )
+
+        tx = models.Transaction(
+            account_id=account.id,
+            type=models.TransactionType.TRANSFER,
+            category="Target Tabungan",
+            amount=amt,
+            transaction_date=contribution_date,
+            notes=tx_note,
+            is_business=bool(account.is_business_account),
+        )
+        db.add(tx)
+        db.flush()
+        linked_tx_id = tx.id
+        linked_account_id = account.id
+
+    db_contrib = models.SavingContribution(
+        goal_id=goal.id,
+        account_id=linked_account_id,
+        transaction_id=linked_tx_id,
+        type=contrib_type,
+        amount=amt,
+        contribution_date=contribution_date,
+        notes=clean_notes,
+    )
+    db.add(db_contrib)
+    goal.updated_at = datetime.now(timezone.utc)
+    return db_contrib
+
+
+def _load_goal_with_relations(
+    db: Session, goal_id: UUID, user_id: UUID
+) -> Optional[models.SavingGoal]:
+    return (
+        db.query(models.SavingGoal)
+        .options(
+            selectinload(models.SavingGoal.contributions).selectinload(
+                models.SavingContribution.account
+            )
+        )
+        .filter(
+            models.SavingGoal.id == goal_id,
+            models.SavingGoal.user_id == user_id,
+        )
+        .first()
+    )
+
+
+def get_saving_goals(
+    db: Session, user_id: UUID, skip: int = 0, limit: int = 100
+) -> list[schemas.SavingGoalResponse]:
+    goals = (
+        db.query(models.SavingGoal)
+        .options(
+            selectinload(models.SavingGoal.contributions).selectinload(
+                models.SavingContribution.account
+            )
+        )
+        .filter(models.SavingGoal.user_id == user_id)
+        .order_by(
+            models.SavingGoal.is_purchased.asc(),
+            models.SavingGoal.created_at.desc(),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return [to_saving_goal_response(g) for g in goals]
+
+
+def get_saving_goal_response(
+    db: Session, goal_id: UUID, user_id: UUID
+) -> Optional[schemas.SavingGoalResponse]:
+    goal = _load_goal_with_relations(db=db, goal_id=goal_id, user_id=user_id)
+    if goal is None:
+        return None
+    return to_saving_goal_response(goal)
+
+
+def create_saving_goal(
+    db: Session, user_id: UUID, payload: schemas.SavingGoalCreate
+) -> schemas.SavingGoalResponse:
+    try:
+        db_goal = models.SavingGoal(
+            user_id=user_id,
+            title=payload.title.strip(),
+            category=(payload.category or "Barang Impian").strip(),
+            target_amount=Decimal(payload.target_amount),
+            saved_amount=Decimal("0.00"),
+            target_date=payload.target_date,
+            notes=payload.notes.strip() if payload.notes and payload.notes.strip() else None,
+        )
+        db.add(db_goal)
+        db.flush()
+
+        if Decimal(payload.initial_amount) > Decimal("0"):
+            _apply_goal_contribution(
+                db=db,
+                goal=db_goal,
+                user_id=user_id,
+                contrib_type="deposit",
+                amount=Decimal(payload.initial_amount),
+                contribution_date=_today_wib(),
+                account_id=payload.account_id,
+                notes="Setoran awal",
+            )
+
+        db.commit()
+        loaded = _load_goal_with_relations(db=db, goal_id=db_goal.id, user_id=user_id)
+        return to_saving_goal_response(loaded)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def update_saving_goal(
+    db: Session, goal_id: UUID, user_id: UUID, payload: schemas.SavingGoalUpdate
+) -> Optional[schemas.SavingGoalResponse]:
+    try:
+        goal = (
+            db.query(models.SavingGoal)
+            .filter(
+                models.SavingGoal.id == goal_id,
+                models.SavingGoal.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if goal is None:
+            return None
+
+        if payload.title is not None:
+            goal.title = payload.title.strip()
+        if payload.category is not None:
+            goal.category = payload.category.strip()
+        if payload.target_amount is not None:
+            goal.target_amount = Decimal(payload.target_amount)
+        if payload.clear_target_date:
+            goal.target_date = None
+        elif payload.target_date is not None:
+            goal.target_date = payload.target_date
+        if payload.notes is not None:
+            goal.notes = payload.notes.strip() or None
+        if payload.is_purchased is not None:
+            goal.is_purchased = payload.is_purchased
+
+        goal.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        loaded = _load_goal_with_relations(db=db, goal_id=goal_id, user_id=user_id)
+        return to_saving_goal_response(loaded)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def contribute_saving_goal(
+    db: Session,
+    goal_id: UUID,
+    user_id: UUID,
+    payload: schemas.SavingContributionCreate,
+) -> Optional[schemas.SavingGoalResponse]:
+    try:
+        goal = (
+            db.query(models.SavingGoal)
+            .filter(
+                models.SavingGoal.id == goal_id,
+                models.SavingGoal.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if goal is None:
+            return None
+
+        _apply_goal_contribution(
+            db=db,
+            goal=goal,
+            user_id=user_id,
+            contrib_type=payload.type,
+            amount=Decimal(payload.amount),
+            contribution_date=payload.contribution_date or _today_wib(),
+            account_id=payload.account_id,
+            notes=payload.notes,
+        )
+        db.commit()
+        loaded = _load_goal_with_relations(db=db, goal_id=goal_id, user_id=user_id)
+        return to_saving_goal_response(loaded)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def delete_saving_contribution(
+    db: Session, goal_id: UUID, contribution_id: UUID, user_id: UUID
+) -> Optional[schemas.SavingGoalResponse]:
+    try:
+        goal = (
+            db.query(models.SavingGoal)
+            .filter(
+                models.SavingGoal.id == goal_id,
+                models.SavingGoal.user_id == user_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if goal is None:
+            return None
+
+        contrib = (
+            db.query(models.SavingContribution)
+            .filter(
+                models.SavingContribution.id == contribution_id,
+                models.SavingContribution.goal_id == goal_id,
+            )
+            .first()
+        )
+        if contrib is None:
+            raise ValueError("Riwayat setoran tidak ditemukan.")
+
+        amt = Decimal(contrib.amount)
+        if contrib.type == "withdraw":
+            goal.saved_amount = Decimal(goal.saved_amount) + amt
+        else:
+            if Decimal(goal.saved_amount) < amt:
+                raise ValueError(
+                    "Setoran tidak dapat dihapus karena sebagian dananya sudah ditarik."
+                )
+            goal.saved_amount = Decimal(goal.saved_amount) - amt
+
+        if contrib.account_id is not None and contrib.transaction_id is not None:
+            account = (
+                db.query(models.Account)
+                .filter(
+                    models.Account.id == contrib.account_id,
+                    models.Account.user_id == user_id,
+                )
+                .with_for_update()
+                .first()
+            )
+            if account is not None:
+                if contrib.type == "withdraw":
+                    account.balance = Decimal(account.balance) - amt
+                else:
+                    account.balance = Decimal(account.balance) + amt
+
+            tx = (
+                db.query(models.Transaction)
+                .filter(models.Transaction.id == contrib.transaction_id)
+                .first()
+            )
+            if tx is not None:
+                db.delete(tx)
+
+        db.delete(contrib)
+        goal.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        loaded = _load_goal_with_relations(db=db, goal_id=goal_id, user_id=user_id)
+        return to_saving_goal_response(loaded)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def delete_saving_goal(db: Session, goal_id: UUID, user_id: UUID) -> bool:
+    goal = (
+        db.query(models.SavingGoal)
+        .filter(
+            models.SavingGoal.id == goal_id,
+            models.SavingGoal.user_id == user_id,
+        )
+        .first()
+    )
+    if goal is None:
+        return False
+    try:
+        db.delete(goal)
         db.commit()
         return True
     except Exception:

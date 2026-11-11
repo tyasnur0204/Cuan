@@ -63,6 +63,9 @@ class User(Base):
     investment_assets = relationship(
         "InvestmentAsset", back_populates="user", cascade="all, delete-orphan"
     )
+    saving_goals = relationship(
+        "SavingGoal", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Account(Base):
@@ -167,6 +170,90 @@ class InvestmentAsset(Base):
     )
 
     user = relationship("User", back_populates="investment_assets")
+
+
+class SavingGoal(Base):
+    __tablename__ = "saving_goals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title = Column(String(150), nullable=False)
+    category = Column(
+        String(80), nullable=False, default="Barang Impian", server_default="Barang Impian"
+    )
+    target_amount = Column(Numeric(18, 2), nullable=False)
+    saved_amount = Column(
+        Numeric(18, 2), nullable=False, default=Decimal("0.00"), server_default="0.00"
+    )
+    target_date = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    is_purchased = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    user = relationship("User", back_populates="saving_goals")
+    contributions = relationship(
+        "SavingContribution",
+        back_populates="goal",
+        cascade="all, delete-orphan",
+        order_by="desc(SavingContribution.contribution_date), desc(SavingContribution.created_at)",
+    )
+
+
+class SavingContribution(Base):
+    __tablename__ = "saving_contributions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    goal_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("saving_goals.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    account_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    transaction_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("transactions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    type = Column(
+        String(20), nullable=False, default="deposit", server_default="deposit"
+    )
+    amount = Column(Numeric(18, 2), nullable=False)
+    contribution_date = Column(Date, nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    goal = relationship("SavingGoal", back_populates="contributions")
+    account = relationship("Account")
 
 
 class APIKey(Base):

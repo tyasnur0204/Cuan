@@ -611,6 +611,26 @@ def dashboard_summary(
         for t in latest_txs
     ]
 
+    # Saving goals overview
+    saving_goals = crud.get_saving_goals(db=db, user_id=effective_user_id, limit=200)
+    active_goals = [g for g in saving_goals if not g.is_purchased]
+    total_goals_saved = sum((g.saved_amount for g in active_goals), Decimal("0.00"))
+    total_goals_target = sum((g.target_amount for g in active_goals), Decimal("0.00"))
+    achieved_goals_count = sum(1 for g in saving_goals if g.is_achieved or g.is_purchased)
+    top_goals = [
+        {
+            "id": str(g.id),
+            "title": g.title,
+            "category": g.category,
+            "saved_amount": float(g.saved_amount),
+            "target_amount": float(g.target_amount),
+            "progress_pct": g.progress_pct,
+            "is_achieved": g.is_achieved,
+            "target_date": g.target_date.isoformat() if g.target_date else None,
+        }
+        for g in active_goals[:3]
+    ]
+
     return {
         "period": {
             "month": target_month,
@@ -626,6 +646,13 @@ def dashboard_summary(
         "inflation_rate_pct": float(inflation_rate),
         "monthly_cashflow": monthly_cashflow,
         "recent_transactions": recent_transactions,
+        "saving_goals_summary": {
+            "total_saved": float(total_goals_saved),
+            "total_target": float(total_goals_target),
+            "active_count": len(active_goals),
+            "achieved_count": achieved_goals_count,
+            "top_goals": top_goals,
+        },
     }
 
 
@@ -866,6 +893,156 @@ def reports_summary(
         "income_by_category": income_by_category,
         "monthly_comparison": monthly_comparison,
     }
+
+
+# ---------------------------------------------------------------------------
+# Saving Goals (Target Tabungan / Celengan Impian)
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/api/v1/goals",
+    response_model=list[schemas.SavingGoalResponse],
+    tags=["Saving Goals"],
+)
+def list_saving_goals(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> list[schemas.SavingGoalResponse]:
+    return crud.get_saving_goals(db=db, user_id=current_user.id, skip=skip, limit=limit)
+
+
+@app.post(
+    "/api/v1/goals",
+    response_model=schemas.SavingGoalResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Saving Goals"],
+)
+def create_saving_goal(
+    payload: schemas.SavingGoalCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> schemas.SavingGoalResponse:
+    try:
+        return crud.create_saving_goal(db=db, user_id=current_user.id, payload=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@app.get(
+    "/api/v1/goals/{goal_id}",
+    response_model=schemas.SavingGoalResponse,
+    tags=["Saving Goals"],
+)
+def get_saving_goal(
+    goal_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> schemas.SavingGoalResponse:
+    goal = crud.get_saving_goal_response(db=db, goal_id=goal_id, user_id=current_user.id)
+    if goal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target tabungan tidak ditemukan",
+        )
+    return goal
+
+
+@app.patch(
+    "/api/v1/goals/{goal_id}",
+    response_model=schemas.SavingGoalResponse,
+    tags=["Saving Goals"],
+)
+def update_saving_goal(
+    goal_id: UUID,
+    payload: schemas.SavingGoalUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> schemas.SavingGoalResponse:
+    goal = crud.update_saving_goal(
+        db=db, goal_id=goal_id, user_id=current_user.id, payload=payload
+    )
+    if goal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target tabungan tidak ditemukan",
+        )
+    return goal
+
+
+@app.delete(
+    "/api/v1/goals/{goal_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Saving Goals"],
+)
+def delete_saving_goal(
+    goal_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> None:
+    deleted = crud.delete_saving_goal(db=db, goal_id=goal_id, user_id=current_user.id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target tabungan tidak ditemukan",
+        )
+
+
+@app.post(
+    "/api/v1/goals/{goal_id}/contribute",
+    response_model=schemas.SavingGoalResponse,
+    tags=["Saving Goals"],
+)
+def contribute_saving_goal(
+    goal_id: UUID,
+    payload: schemas.SavingContributionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> schemas.SavingGoalResponse:
+    try:
+        goal = crud.contribute_saving_goal(
+            db=db, goal_id=goal_id, user_id=current_user.id, payload=payload
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if goal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target tabungan tidak ditemukan",
+        )
+    return goal
+
+
+@app.delete(
+    "/api/v1/goals/{goal_id}/contributions/{contribution_id}",
+    response_model=schemas.SavingGoalResponse,
+    tags=["Saving Goals"],
+)
+def delete_saving_contribution(
+    goal_id: UUID,
+    contribution_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> schemas.SavingGoalResponse:
+    try:
+        goal = crud.delete_saving_contribution(
+            db=db,
+            goal_id=goal_id,
+            contribution_id=contribution_id,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if goal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target tabungan tidak ditemukan",
+        )
+    return goal
 
 
 # ---------------------------------------------------------------------------
