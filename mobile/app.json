@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "FinMate",
+    "slug": "finmate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#067F5B"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "id.finmate.app"
+    },
+    "android": {
+      "package": "id.finmate.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#067F5B",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
