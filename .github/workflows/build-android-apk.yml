@@ -1,0 +1,72 @@
+name: Build FinMate Android APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'mobile/package-lock.json'
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Prebuild Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
+      - name: Build Android Release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Stage FinMate APK
+        run: |
+          mkdir -p release-assets
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk release-assets/FinMate.apk
+          ls -lh release-assets/FinMate.apk
+
+      - name: Publish APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: FinMate Android App (Latest)
+          body: |
+            Build APK Android untuk **FinMate** (React Native / Expo).
+            Download dan pasang `FinMate.apk` langsung di perangkat Android Anda.
+            Terhubung otomatis ke server produksi FinMate.
+          files: release-assets/FinMate.apk
+          make_latest: true
+          fail_on_unmatched_files: true
