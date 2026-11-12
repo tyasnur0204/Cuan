@@ -25,12 +25,12 @@ export const getInstalledAppInfo = () => {
     ? Application.nativeBuildVersion
     : null;
 
-  const version = String(nativeVersion || cfg.version || '1.1.0');
+  const version = String(nativeVersion || cfg.version || '1.2.0');
   const parsedBuild = Number.parseInt(
-    String(nativeBuildRaw || cfg?.android?.versionCode || '2'),
+    String(nativeBuildRaw || cfg?.android?.versionCode || '3'),
     10
   );
-  const versionCode = Number.isFinite(parsedBuild) ? parsedBuild : 2;
+  const versionCode = Number.isFinite(parsedBuild) ? parsedBuild : 3;
 
   return {
     version,

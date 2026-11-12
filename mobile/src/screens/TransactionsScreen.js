@@ -41,6 +41,9 @@ const TransactionsScreen = ({
   onClearCreateModal,
   onNavigate,
   onDataChanged,
+  refreshKey = 0,
+  pendingNotifCount = 0,
+  onOpenNotifReview,
 }) => {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -115,7 +118,7 @@ const TransactionsScreen = ({
 
   useEffect(() => {
     loadData(false);
-  }, [loadData]);
+  }, [loadData, refreshKey]);
 
   const accountNameMap = accounts.reduce((map, acc) => {
     map[acc.id] = acc.name;
@@ -270,6 +273,18 @@ const TransactionsScreen = ({
             );
           })}
         </ScrollView>
+
+        {pendingNotifCount > 0 && (
+          <TouchableOpacity
+            onPress={() => onOpenNotifReview?.()}
+            style={styles.notifQueueBanner}
+          >
+            <Ionicons name="notifications" size={16} color={COLORS.emerald} />
+            <Text style={styles.notifQueueText}>
+              {pendingNotifCount} notifikasi pembayaran menunggu konfirmasi →
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {accounts.length === 0 && !loading && (
           <View style={styles.warnBox}>
@@ -772,6 +787,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   saveBtnText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+  notifQueueBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.emeraldLight,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  notifQueueText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.emeraldDark,
+  },
 });
 
 export default TransactionsScreen;

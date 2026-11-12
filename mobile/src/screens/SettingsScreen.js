@@ -23,6 +23,18 @@ import {
   getInstalledAppInfo,
   openDownloadInBrowser,
 } from '../services/appUpdater';
+import { MONITORED_APPS } from '../services/paymentNotificationParser';
+import {
+  clearAllHistory,
+  getNotificationListenerStatus,
+  isNativeNotifModuleAvailable,
+  loadNotifSettings,
+  openAppDetailsSettings,
+  openBatteryOptimizationSettings,
+  openNotificationAccessSettings,
+  saveNotifSettings,
+  simulatePaymentNotification,
+} from '../services/paymentNotifications';
 import { COLORS, SHADOW } from '../theme/theme';
 import {
   extractApiError,
@@ -39,13 +51,34 @@ const SettingsScreen = ({
   updateInfo,
   onCheckUpdate,
   onOpenUpdateModal,
+  initialSection = 'accounts',
+  pendingNotifs = [],
+  historyNotifs = [],
+  onOpenNotifReview,
+  onSyncNotificationState,
 }) => {
-  const [section, setSection] = useState('accounts');
+  const [section, setSection] = useState(initialSection || 'accounts');
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatusText, setUpdateStatusText] = useState('');
   const installedInfo = getInstalledAppInfo();
+
+  // Notification listener state
+  const [notifSettings, setNotifSettings] = useState(null);
+  const [notifStatus, setNotifStatus] = useState({
+    supported: isNativeNotifModuleAvailable,
+    permissionGranted: false,
+    isExpoGo: installedInfo.isExpoGo,
+    isStandaloneAndroid: installedInfo.isStandaloneAndroid,
+  });
+  const [simResultMsg, setSimResultMsg] = useState('');
+
+  useEffect(() => {
+    if (initialSection) {
+      setSection(initialSection);
+    }
+  }, [initialSection]);
 
   // Profile
   const [editingProfile, setEditingProfile] = useState(false);
@@ -73,13 +106,15 @@ const SettingsScreen = ({
   const loadSettingsData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const [meRes, accRes, keyRes, savedInf] = await Promise.all([
+      const [meRes, accRes, keyRes, savedInf, nCfg, nStat] = await Promise.all([
         api.get('/me'),
         api.get('/accounts', {
           params: user?.id ? { user_id: user.id } : undefined,
         }),
         api.get('/api-keys'),
         AsyncStorage.getItem(STORAGE_KEYS.INFLATION_RATE),
+        loadNotifSettings(),
+        getNotificationListenerStatus(),
       ]);
       const me = meRes.data;
       setProfileName(me.username);
@@ -89,6 +124,8 @@ const SettingsScreen = ({
       setAccounts(accRes.data ?? []);
       setApiKeys(keyRes.data ?? []);
       if (savedInf) setInflationRate(savedInf);
+      setNotifSettings(nCfg);
+      setNotifStatus(nStat);
     } catch (err) {
       Alert.alert('Error', extractApiError(err, 'Gagal memuat data pengaturan'));
     } finally {
@@ -255,8 +292,82 @@ const SettingsScreen = ({
   const handleResetDefaultServer = async () => {
     const savedUrl = await setCustomApiBaseUrl('');
     setServerUrl(savedUrl);
+    await saveNotifSettings({});
     onDataChanged?.();
     Alert.alert('Reset Berhasil', `Server API dikembalikan ke default: ${savedUrl}`);
+  };
+
+  const handleUpdateNotifSetting = async (patch) => {
+    const next = await saveNotifSettings(patch);
+    setNotifSettings(next);
+    const stat = await getNotificationListenerStatus();
+    setNotifStatus(stat);
+    await onSyncNotificationState?.();
+  };
+
+  const handleToggleMonitoredApp = async (appKey) => {
+    const cur = notifSettings?.enabledApps || [];
+    const exists = cur.includes(appKey);
+    const nextApps = exists ? cur.filter((k) => k !== appKey) : [...cur, appKey];
+    await handleUpdateNotifSetting({ enabledApps: nextApps });
+  };
+
+  const handleMapAppAccount = async (appKey, accId) => {
+    const currentMap = notifSettings?.accountMap || {};
+    const nextMap = { ...currentMap, [appKey]: accId };
+    await handleUpdateNotifSetting({ accountMap: nextMap });
+  };
+
+  const handleToggleBusinessApp = async (appKey) => {
+    const cur = notifSettings?.businessApps || [];
+    const exists = cur.includes(appKey);
+    const nextBiz = exists ? cur.filter((k) => k !== appKey) : [...cur, appKey];
+    await handleUpdateNotifSetting({ businessApps: nextBiz });
+  };
+
+  const handleSimulateAppNotif = async (appItem, isIncome = false, isPromo = false) => {
+    setSimResultMsg('');
+    try {
+      const sample = isPromo
+        ? {
+            title: `Promo ${appItem.shortName}!`,
+            text: `Cashback s.d Rp50.000 bayar pakai ${appItem.shortName} hari ini!`,
+          }
+        : isIncome
+          ? appItem.sampleIncome
+          : appItem.sampleExpense;
+
+      const res = await simulatePaymentNotification({
+        packageName: appItem.packages[0],
+        title: sample.title,
+        text: sample.text,
+        accounts,
+      });
+
+      if (!res.matched) {
+        setSimResultMsg(
+          `Filter Anti-Promo: Notifikasi "${sample.title}" otomatis diabaikan (tidak tercatat sebagai transaksi).`
+        );
+      } else if (res.synced) {
+        await onSyncNotificationState?.();
+        onDataChanged?.();
+        setSimResultMsg(
+          `Auto-Catat Berhasil: ${res.parsed.appName} (${res.parsed.type === 'Income' ? '+' : '-'}${formatCurrency(res.parsed.amount)}) langsung masuk ke riwayat transaksi.`
+        );
+      } else {
+        await onSyncNotificationState?.();
+        setSimResultMsg(
+          `Masuk Antrean Konfirmasi: ${res.parsed.appName} (${formatCurrency(res.parsed.amount)}). Ketuk tombol "Tinjau Antrean" untuk mencatat.`
+        );
+      }
+    } catch (err) {
+      setSimResultMsg(extractApiError(err, 'Gagal menjalankan simulasi notifikasi.'));
+    }
+  };
+
+  const handleClearNotifHistory = async () => {
+    await clearAllHistory();
+    await onSyncNotificationState?.();
   };
 
   const handleManualCheckUpdate = async () => {
@@ -379,6 +490,13 @@ const SettingsScreen = ({
       >
         {[
           { key: 'accounts', label: 'Akun Keuangan' },
+          {
+            key: 'notif',
+            label:
+              pendingNotifs.length > 0
+                ? `Deteksi Bayar (${pendingNotifs.length})`
+                : 'Deteksi Bayar',
+          },
           { key: 'security', label: 'Keamanan & M2M' },
           { key: 'prefs', label: 'Preferensi' },
           {
@@ -479,6 +597,401 @@ const SettingsScreen = ({
             ))
           )}
         </View>
+      )}
+
+      {section === 'notif' && (
+        <>
+          <View style={[styles.card, SHADOW]}>
+            <View style={styles.notifHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>
+                  Deteksi Notifikasi Pembayaran
+                </Text>
+                <Text style={styles.mutedDesc}>
+                  Tangkap transaksi masuk/keluar otomatis dari ShopeePay, SeaBank,
+                  DANA, GoPay, dan BRImo (dengan filter anti-promo & anti-OTP).
+                </Text>
+              </View>
+              <Switch
+                value={Boolean(notifSettings?.enabled)}
+                onValueChange={(v) => handleUpdateNotifSetting({ enabled: v })}
+                trackColor={{ false: '#D1D5DB', true: '#6EE7B7' }}
+                thumbColor={notifSettings?.enabled ? COLORS.emerald : '#F9FAFB'}
+              />
+            </View>
+
+            {/* Status & Android Permissions */}
+            {!notifStatus.supported ? (
+              <View style={styles.infoNoticeBox}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={COLORS.blue}
+                />
+                <Text style={styles.infoNoticeText}>
+                  Saat ini berjalan di {installedInfo.isExpoGo ? 'Expo Go' : 'Web/Non-Android'}.
+                  Listener latar belakang aktif penuh di APK CUAN Android v1.2.0 ke atas. Anda
+                  tetap dapat mencoba Simulator di bawah.
+                </Text>
+              </View>
+            ) : notifStatus.permissionGranted ? (
+              <View style={styles.grantedBox}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color={COLORS.emerald}
+                />
+                <Text style={styles.grantedText}>
+                  Izin Akses Notifikasi Android aktif.{' '}
+                  {notifSettings?.enabled
+                    ? 'Pemantauan berjalan otomatis.'
+                    : 'Aktifkan sakelar di atas untuk mulai memantau.'}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.permWarnBox}>
+                <View style={styles.permWarnHead}>
+                  <Ionicons name="warning-outline" size={18} color="#B45309" />
+                  <Text style={styles.permWarnTitle}>
+                    Izin Akses Notifikasi Belum Aktif
+                  </Text>
+                </View>
+                <Text style={styles.permWarnDesc}>
+                  Untuk Android 13–15 (APK sideload), lakukan 2 langkah sekali saja:
+                  {'\n'}1. Buka Info Aplikasi → ikon titik 3 kanan atas → pilih
+                  {' "'}Izinkan pengaturan terbatas{'"'}.
+                  {'\n'}2. Buka Akses Notifikasi lalu aktifkan sakelar CUAN.
+                </Text>
+                <View style={styles.permBtnRow}>
+                  <TouchableOpacity
+                    onPress={() => openAppDetailsSettings()}
+                    style={styles.permSecondaryBtn}
+                  >
+                    <Ionicons name="settings-outline" size={14} color={COLORS.navy} />
+                    <Text style={styles.permSecondaryText}>1. Info Aplikasi</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => openNotificationAccessSettings()}
+                    style={styles.permPrimaryBtn}
+                  >
+                    <Ionicons name="notifications-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.permPrimaryText}>2. Akses Notifikasi</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {notifStatus.supported && (
+              <TouchableOpacity
+                onPress={() => openBatteryOptimizationSettings()}
+                style={styles.secondaryOutlineBtn}
+              >
+                <Ionicons name="battery-charging-outline" size={16} color={COLORS.navy} />
+                <Text style={styles.secondaryOutlineText}>
+                  Matikan Hemat Baterai (Agar Stabil di Background)
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Mode Selection: Antrean vs Auto-Catat */}
+          <View style={[styles.card, SHADOW]}>
+            <Text style={styles.cardTitle}>Mode Pencatatan Otomatis</Text>
+            <View style={styles.modeCardsCol}>
+              {[
+                {
+                  key: 'queue',
+                  icon: 'list-outline',
+                  title: 'Antrean Konfirmasi (1-Ketuk)',
+                  desc: 'Notifikasi valid masuk daftar review dulu supaya kategori & rekening bisa dicek sebelum disimpan.',
+                },
+                {
+                  key: 'auto',
+                  icon: 'flash-outline',
+                  title: 'Auto-Catat Langsung (Background)',
+                  desc: 'Langsung mencatat transaksi otomatis di latar belakang ke rekening pilihan (tetap masuk antrean bila offline).',
+                },
+              ].map((m) => {
+                const active = (notifSettings?.mode || 'queue') === m.key;
+                return (
+                  <TouchableOpacity
+                    key={m.key}
+                    onPress={() => handleUpdateNotifSetting({ mode: m.key })}
+                    style={[styles.modeOptionCard, active && styles.modeOptionActive]}
+                  >
+                    <View style={styles.modeOptionHead}>
+                      <Ionicons
+                        name={m.icon}
+                        size={17}
+                        color={active ? COLORS.emerald : COLORS.navy}
+                      />
+                      <Text
+                        style={[
+                          styles.modeOptionTitle,
+                          active && { color: COLORS.emeraldDark },
+                        ]}
+                      >
+                        {m.title}
+                      </Text>
+                    </View>
+                    <Text style={styles.mutedDesc}>{m.desc}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>Rekening Default (Untuk Auto-Catat)</Text>
+            {accounts.length === 0 ? (
+              <Text style={styles.mutedDesc}>
+                Tambahkan minimal 1 rekening di tab Akun Keuangan terlebih dahulu.
+              </Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.tabsRow}>
+                  {accounts.map((acc) => {
+                    const selected =
+                      (notifSettings?.defaultAccountId || accounts[0]?.id) === acc.id;
+                    return (
+                      <TouchableOpacity
+                        key={acc.id}
+                        onPress={() =>
+                          handleUpdateNotifSetting({ defaultAccountId: acc.id })
+                        }
+                        style={[styles.tabPill, selected && styles.tabPillActive]}
+                      >
+                        <Text
+                          style={[
+                            styles.tabText,
+                            selected && styles.tabTextActive,
+                          ]}
+                        >
+                          {acc.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+
+          {/* 5 Priority Apps & Account Mapping */}
+          <View style={[styles.card, SHADOW]}>
+            <Text style={styles.cardTitle}>
+              Aplikasi Pembayaran & Pemetaan Rekening
+            </Text>
+            <Text style={styles.mutedDesc}>
+              Pilih aplikasi yang dipantau dan arahkan otomatis ke rekening CUAN
+              masing-masing.
+            </Text>
+
+            {MONITORED_APPS.map((appItem) => {
+              const isEnabled = (notifSettings?.enabledApps || []).includes(appItem.key);
+              const mappedAccId =
+                notifSettings?.accountMap?.[appItem.key] || '';
+              const isBiz = (notifSettings?.businessApps || []).includes(
+                appItem.key
+              );
+
+              return (
+                <View key={appItem.key} style={styles.appMapRow}>
+                  <View style={styles.appMapHeader}>
+                    <View
+                      style={[
+                        styles.appIconBox,
+                        { backgroundColor: appItem.badgeBg },
+                      ]}
+                    >
+                      <Ionicons
+                        name={appItem.iconName}
+                        size={16}
+                        color={appItem.badgeColor}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.accName}>{appItem.name}</Text>
+                      <Text style={styles.mutedDesc}>
+                        {appItem.packages.join(' · ')}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={isEnabled}
+                      onValueChange={() => handleToggleMonitoredApp(appItem.key)}
+                      trackColor={{ false: '#D1D5DB', true: '#6EE7B7' }}
+                      thumbColor={isEnabled ? COLORS.emerald : '#F9FAFB'}
+                    />
+                  </View>
+
+                  {isEnabled && accounts.length > 0 && (
+                    <View style={styles.appMapBody}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <View style={styles.tabsRow}>
+                          <TouchableOpacity
+                            onPress={() => handleMapAppAccount(appItem.key, '')}
+                            style={[
+                              styles.miniPill,
+                              !mappedAccId && styles.miniPillActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.miniPillText,
+                                !mappedAccId && styles.miniPillTextActive,
+                              ]}
+                            >
+                              Ikuti Default
+                            </Text>
+                          </TouchableOpacity>
+                          {accounts.map((acc) => (
+                            <TouchableOpacity
+                              key={acc.id}
+                              onPress={() =>
+                                handleMapAppAccount(appItem.key, acc.id)
+                              }
+                              style={[
+                                styles.miniPill,
+                                mappedAccId === acc.id && styles.miniPillActive,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.miniPillText,
+                                  mappedAccId === acc.id &&
+                                    styles.miniPillTextActive,
+                                ]}
+                              >
+                                {acc.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+
+                      <TouchableOpacity
+                        onPress={() => handleToggleBusinessApp(appItem.key)}
+                        style={styles.bizTagBtn}
+                      >
+                        <Ionicons
+                          name={isBiz ? 'checkbox' : 'square-outline'}
+                          size={15}
+                          color={isBiz ? COLORS.emerald : COLORS.grayText}
+                        />
+                        <Text style={styles.bizTagText}>
+                          Tandai otomatis sebagai transaksi Usaha / Bisnis
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Pending Review Queue + Recent History */}
+          <View style={[styles.card, SHADOW]}>
+            <View style={styles.notifHeaderRow}>
+              <Text style={styles.cardTitle}>
+                Antrean ({pendingNotifs.length}) & Riwayat ({historyNotifs.length})
+              </Text>
+              {pendingNotifs.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => onOpenNotifReview?.()}
+                  style={styles.reviewActionBtn}
+                >
+                  <Text style={styles.reviewActionText}>Tinjau Antrean</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {historyNotifs.length === 0 ? (
+              <Text style={styles.mutedDesc}>
+                Belum ada transaksi yang tercatat dari deteksi notifikasi.
+              </Text>
+            ) : (
+              <>
+                {historyNotifs.slice(0, 6).map((h) => (
+                  <View key={h.id} style={styles.accRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.accName}>
+                        {h.appName} · {h.category}
+                      </Text>
+                      <Text style={styles.mutedDesc} numberOfLines={1}>
+                        {h.rawText || h.notes}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.histAmount,
+                        {
+                          color:
+                            h.type === 'Income' ? COLORS.emerald : COLORS.danger,
+                        },
+                      ]}
+                    >
+                      {h.type === 'Income' ? '+' : '-'}
+                      {formatCurrency(h.amount)}
+                    </Text>
+                  </View>
+                ))}
+                <TouchableOpacity
+                  onPress={handleClearNotifHistory}
+                  style={styles.secondaryOutlineBtn}
+                >
+                  <Ionicons name="trash-outline" size={14} color={COLORS.grayText} />
+                  <Text style={styles.secondaryOutlineText}>Bersihkan Riwayat</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {/* Uji Coba / Simulasi Notifikasi */}
+          <View style={[styles.card, SHADOW]}>
+            <Text style={styles.cardTitle}>Simulasi & Uji Parser</Text>
+            <Text style={styles.mutedDesc}>
+              Uji langsung deteksi notifikasi untuk tiap aplikasi sesuai mode aktif (
+              {notifSettings?.mode === 'auto'
+                ? 'Auto-Catat Langsung'
+                : 'Antrean Konfirmasi'}
+              ).
+            </Text>
+            <View style={styles.simGrid}>
+              {MONITORED_APPS.map((appItem) => (
+                <View key={appItem.key} style={styles.simRow}>
+                  <Text style={styles.simAppLabel}>{appItem.shortName}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleSimulateAppNotif(appItem, false, false)}
+                    style={styles.simBtn}
+                  >
+                    <Ionicons name="play-outline" size={12} color={COLORS.navy} />
+                    <Text style={styles.simBtnText}>Keluar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleSimulateAppNotif(appItem, true, false)}
+                    style={styles.simBtn}
+                  >
+                    <Ionicons name="play-outline" size={12} color={COLORS.emerald} />
+                    <Text style={[styles.simBtnText, { color: COLORS.emerald }]}>
+                      Masuk
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleSimulateAppNotif(appItem, false, true)}
+                    style={styles.simBtn}
+                  >
+                    <Text style={[styles.simBtnText, { color: COLORS.grayText }]}>
+                      Promo
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            {!!simResultMsg && (
+              <View style={styles.statusBanner}>
+                <Text style={styles.statusBannerText}>{simResultMsg}</Text>
+              </View>
+            )}
+          </View>
+        </>
       )}
 
       {section === 'security' && (
@@ -909,6 +1422,147 @@ const styles = StyleSheet.create({
     color: COLORS.grayText,
     textDecorationLine: 'underline',
   },
+  notifHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  infoNoticeBox: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.blueBg,
+    alignItems: 'flex-start',
+  },
+  infoNoticeText: { flex: 1, fontSize: 12, color: COLORS.navy, lineHeight: 17 },
+  grantedBox: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.emeraldLight,
+    alignItems: 'center',
+  },
+  grantedText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.emeraldDark,
+    lineHeight: 17,
+  },
+  permWarnBox: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    gap: 8,
+  },
+  permWarnHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  permWarnTitle: { fontSize: 13, fontWeight: '800', color: '#92400E' },
+  permWarnDesc: { fontSize: 12, color: '#78350F', lineHeight: 17 },
+  permBtnRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  permSecondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permSecondaryText: { fontSize: 12, fontWeight: '700', color: COLORS.navy },
+  permPrimaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.emerald,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permPrimaryText: { fontSize: 12, fontWeight: '800', color: '#FFFFFF' },
+  modeCardsCol: { gap: 8 },
+  modeOptionCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+    gap: 4,
+  },
+  modeOptionActive: {
+    borderColor: COLORS.emerald,
+    backgroundColor: COLORS.emeraldLight,
+  },
+  modeOptionHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  modeOptionTitle: { fontSize: 13, fontWeight: '800', color: COLORS.navy },
+  appMapRow: {
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 8,
+  },
+  appMapHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  appIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appMapBody: { paddingLeft: 44, gap: 6 },
+  miniPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  miniPillActive: {
+    backgroundColor: COLORS.navy,
+    borderColor: COLORS.navy,
+  },
+  miniPillText: { fontSize: 11, fontWeight: '600', color: COLORS.navy },
+  miniPillTextActive: { color: '#FFFFFF' },
+  bizTagBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 2 },
+  bizTagText: { fontSize: 11, color: COLORS.grayText, fontWeight: '600' },
+  reviewActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: COLORS.emerald,
+  },
+  reviewActionText: { fontSize: 11, fontWeight: '800', color: '#FFFFFF' },
+  histAmount: { fontSize: 12, fontWeight: '800' },
+  simGrid: { gap: 8 },
+  simRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  simAppLabel: { width: 78, fontSize: 12, fontWeight: '700', color: COLORS.navy },
+  simBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  simBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.navy },
 });
 
 export default SettingsScreen;

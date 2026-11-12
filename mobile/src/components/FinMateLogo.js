@@ -1,10 +1,13 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { COLORS } from '../theme/theme';
 
 const FinMateLogo = ({ size = 40, variant = 'glass' }) => {
   const isSolid = variant === 'solid';
+  const isLight = variant === 'light';
+  const strokeColor = isLight ? COLORS.navy : '#FFFFFF';
+
   return (
     <View
       style={[
@@ -13,48 +16,57 @@ const FinMateLogo = ({ size = 40, variant = 'glass' }) => {
           width: size,
           height: size,
           borderRadius: Math.round(size * 0.28),
-          backgroundColor: isSolid ? COLORS.emerald : 'rgba(255,255,255,0.16)',
-          borderColor: isSolid ? COLORS.emerald : 'rgba(255,255,255,0.25)',
+          backgroundColor: isSolid
+            ? COLORS.emerald
+            : isLight
+              ? COLORS.bg
+              : 'rgba(255,255,255,0.16)',
+          borderColor: isSolid
+            ? COLORS.emerald
+            : isLight
+              ? COLORS.border
+              : 'rgba(255,255,255,0.25)',
           borderWidth: isSolid ? 0 : 1,
         },
       ]}
     >
       <Svg
-        width={Math.round(size * 0.62)}
-        height={Math.round(size * 0.62)}
+        width={Math.round(size * 0.68)}
+        height={Math.round(size * 0.68)}
         viewBox="0 0 36 36"
         fill="none"
       >
-        <Rect
-          x="6"
-          y="15"
-          width="24"
-          height="14"
-          rx="4"
-          fill="#FFFFFF"
-          fillOpacity={0.22}
-          stroke="#FFFFFF"
-          strokeWidth="2"
-        />
         <Path
-          d="M22 20.5H28.5V23.5H22C21.1716 23.5 20.5 22.8284 20.5 22C20.5 21.1716 21.1716 20.5 22 20.5Z"
-          fill="#FFFFFF"
-        />
-        <Path
-          d="M18 15V9"
-          stroke="#FFFFFF"
-          strokeWidth="2"
+          d="M6.8 13.6L23.2 6.4Q25.3 5.45 26.2 7.5L28.6 13.5"
+          fill={strokeColor}
+          fillOpacity={0.14}
+          stroke={strokeColor}
+          strokeWidth="2.5"
           strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Rect
+          x="4"
+          y="13.5"
+          width="28"
+          height="17.5"
+          rx="4"
+          fill={strokeColor}
+          fillOpacity={0.12}
+          stroke={strokeColor}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
         />
         <Path
-          d="M18 11.5C18 8 15 6 11.5 6.5C11.5 10 14 12.5 18 11.5Z"
-          fill="#FFFFFF"
+          d="M32 18.6H24.8A3.65 3.65 0 0 0 24.8 25.9H32"
+          fill={strokeColor}
+          fillOpacity={0.16}
+          stroke={strokeColor}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
-        <Path
-          d="M18 10.5C18 7 21 5 24.5 5.5C24.5 9 22 11.5 18 10.5Z"
-          fill="#FFFFFF"
-          fillOpacity={0.85}
-        />
+        <Circle cx="24.8" cy="22.25" r="1.65" fill={strokeColor} />
       </Svg>
     </View>
   );

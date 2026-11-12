@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import DetectedTxReviewModal from './src/components/DetectedTxReviewModal';
 import FinMateLogo from './src/components/FinMateLogo';
 import UpdateModal from './src/components/UpdateModal';
 import BudgetsScreen from './src/screens/BudgetsScreen';
@@ -33,6 +35,11 @@ import {
   isUpdateSnoozed,
   snoozeUpdatePrompt,
 } from './src/services/appUpdater';
+import {
+  reconcileNotificationQueues,
+  subscribeNativeNotificationEvents,
+  syncNativeNotifConfig,
+} from './src/services/paymentNotifications';
 import { COLORS, SHADOW } from './src/theme/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -88,15 +95,49 @@ function MainApp() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [updateInfo, setUpdateInfo] = useState(null);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [notifAccounts, setNotifAccounts] = useState([]);
+  const [pendingNotifs, setPendingNotifs] = useState([]);
+  const [historyNotifs, setHistoryNotifs] = useState([]);
+  const [notifReviewOpen, setNotifReviewOpen] = useState(false);
+  const [settingsInitialSection, setSettingsInitialSection] = useState('accounts');
+
+  const bumpRefresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const syncNotificationState = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      await syncNativeNotifConfig();
+      const accRes = await api.get('/accounts', {
+        params: { user_id: user.id },
+      });
+      const accountsList = accRes.data ?? [];
+      setNotifAccounts(accountsList);
+      const { pending, history, autoSyncedCount } =
+        await reconcileNotificationQueues({ accounts: accountsList });
+      setPendingNotifs(pending);
+      setHistoryNotifs(history);
+      if (autoSyncedCount > 0) {
+        bumpRefresh();
+      }
+    } catch {
+      // Ignore background notif sync failure (e.g. offline)
+    }
+  }, [user?.id, bumpRefresh]);
 
   const handleLogout = useCallback(async () => {
+    await syncNativeNotifConfig(null, { clearToken: true });
     await AsyncStorage.multiRemove([STORAGE_KEYS.TOKEN, STORAGE_KEYS.USER]);
     setUser(null);
+    setPendingNotifs([]);
+    setHistoryNotifs([]);
     setActiveRoute('dashboard');
   }, []);
 
   useEffect(() => {
     setOnUnauthorized(() => {
+      syncNativeNotifConfig(null, { clearToken: true }).catch(() => {});
       setUser(null);
       setActiveRoute('dashboard');
     });
@@ -174,6 +215,28 @@ function MainApp() {
   }, [booting, triggerUpdateCheck]);
 
   useEffect(() => {
+    if (!booting && user?.id) {
+      syncNotificationState();
+    }
+  }, [booting, user?.id, syncNotificationState]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const unsubNative = subscribeNativeNotificationEvents(() => {
+      syncNotificationState();
+    });
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        syncNotificationState();
+      }
+    });
+    return () => {
+      unsubNative?.();
+      appStateSub?.remove();
+    };
+  }, [user?.id, syncNotificationState]);
+
+  useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (user && activeRoute !== 'dashboard') {
         setActiveRoute('dashboard');
@@ -190,11 +253,12 @@ function MainApp() {
       setActiveRoute('transactions');
       return;
     }
+    if (target === 'settings_notif') {
+      setSettingsInitialSection('notif');
+      setActiveRoute('settings');
+      return;
+    }
     setActiveRoute(target);
-  }, []);
-
-  const bumpRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
   }, []);
 
   const handleDismissUpdate = async () => {
@@ -243,6 +307,17 @@ function MainApp() {
             </TouchableOpacity>
 
             <View style={styles.headerActions}>
+              {pendingNotifs.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setNotifReviewOpen(true)}
+                  style={styles.notifPillBtn}
+                  accessibilityLabel="Transaksi Terdeteksi"
+                >
+                  <Ionicons name="notifications" size={15} color={COLORS.emerald} />
+                  <Text style={styles.notifPillText}>{pendingNotifs.length}</Text>
+                </TouchableOpacity>
+              )}
+
               {updateInfo?.hasUpdate && (
                 <TouchableOpacity
                   onPress={() => setUpdateModalVisible(true)}
@@ -285,7 +360,10 @@ function MainApp() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setActiveRoute('settings')}
+                onPress={() => {
+                  setSettingsInitialSection('accounts');
+                  setActiveRoute('settings');
+                }}
                 style={[
                   styles.avatarBtn,
                   activeRoute === 'settings' && styles.avatarBtnActive,
@@ -312,6 +390,8 @@ function MainApp() {
                 user={user}
                 onNavigate={navigateTo}
                 refreshKey={refreshKey}
+                pendingNotifCount={pendingNotifs.length}
+                onOpenNotifReview={() => setNotifReviewOpen(true)}
               />
             )}
             {activeRoute === 'transactions' && (
@@ -321,6 +401,9 @@ function MainApp() {
                 onClearCreateModal={() => setOpenTxCreate(false)}
                 onNavigate={navigateTo}
                 onDataChanged={bumpRefresh}
+                refreshKey={refreshKey}
+                pendingNotifCount={pendingNotifs.length}
+                onOpenNotifReview={() => setNotifReviewOpen(true)}
               />
             )}
             {activeRoute === 'budgets' && (
@@ -342,6 +425,11 @@ function MainApp() {
                 updateInfo={updateInfo}
                 onCheckUpdate={(opts) => triggerUpdateCheck(opts)}
                 onOpenUpdateModal={() => setUpdateModalVisible(true)}
+                initialSection={settingsInitialSection}
+                pendingNotifs={pendingNotifs}
+                historyNotifs={historyNotifs}
+                onOpenNotifReview={() => setNotifReviewOpen(true)}
+                onSyncNotificationState={syncNotificationState}
               />
             )}
           </View>
@@ -461,6 +549,15 @@ function MainApp() {
         updateInfo={updateInfo}
         onDismissLater={handleDismissUpdate}
       />
+
+      <DetectedTxReviewModal
+        visible={notifReviewOpen}
+        pendingItems={pendingNotifs}
+        accounts={notifAccounts}
+        onClose={() => setNotifReviewOpen(false)}
+        onRefreshQueues={syncNotificationState}
+        onTransactionSaved={bumpRefresh}
+      />
     </>
   );
 }
@@ -528,6 +625,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.emeraldLight,
   },
   updatePillText: { fontSize: 11, fontWeight: '700', color: COLORS.emerald },
+  notifPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 99,
+    backgroundColor: COLORS.emeraldLight,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  notifPillText: { fontSize: 11, fontWeight: '800', color: COLORS.emeraldDark },
   headerIconBtn: {
     width: 36,
     height: 36,

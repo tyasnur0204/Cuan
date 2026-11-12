@@ -16,7 +16,13 @@ import api, { STORAGE_KEYS } from '../services/api';
 import { COLORS, SHADOW } from '../theme/theme';
 import { extractApiError, formatCurrency, MONTH_NAMES_ID } from '../utils/format';
 
-const DashboardScreen = ({ user, onNavigate, refreshKey }) => {
+const DashboardScreen = ({
+  user,
+  onNavigate,
+  refreshKey,
+  pendingNotifCount = 0,
+  onOpenNotifReview,
+}) => {
   const [summary, setSummary] = useState(null);
   const [businessStats, setBusinessStats] = useState({
     income: 0,
@@ -137,6 +143,27 @@ const DashboardScreen = ({ user, onNavigate, refreshKey }) => {
           <Text style={styles.reportPillText}>Laporan</Text>
         </TouchableOpacity>
       </View>
+
+      {pendingNotifCount > 0 && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => onOpenNotifReview?.()}
+          style={[styles.notifPendingBanner, SHADOW]}
+        >
+          <View style={styles.notifPendingIcon}>
+            <Ionicons name="notifications" size={18} color={COLORS.emerald} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.notifPendingTitle}>
+              {pendingNotifCount} Pembayaran Terdeteksi Otomatis
+            </Text>
+            <Text style={styles.notifPendingSub}>
+              Ketuk untuk konfirmasi &amp; catat dalam 1 detik
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.emeraldDark} />
+        </TouchableOpacity>
+      )}
 
       {!!error && (
         <View style={styles.errorBox}>
@@ -626,6 +653,26 @@ const styles = StyleSheet.create({
   },
   bizCellLabel: { fontSize: 12, color: COLORS.grayText, fontWeight: '600' },
   bizCellVal: { fontSize: 14, fontWeight: '800' },
+  notifPendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: COLORS.emeraldLight,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 14,
+    padding: 12,
+  },
+  notifPendingIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifPendingTitle: { fontSize: 13, fontWeight: '800', color: COLORS.emeraldDark },
+  notifPendingSub: { fontSize: 11, color: COLORS.navy, marginTop: 1 },
 });
 
 export default DashboardScreen;

@@ -76,10 +76,10 @@ jobs:
             commit: (process.env.GITHUB_SHA || '').slice(0, 7),
             built_at: new Date().toISOString(),
             release_notes: [
-              'Perbaikan crash APK standalone (expo-font & splash screen)',
-              'Perbaikan error tambah/muat akun & sinkronisasi data antar pengguna',
-              'Fitur Target Tabungan untuk barang impian + isi tabungan fleksibel',
-              'Fitur Update Otomatis langsung dari dalam aplikasi Android',
+              'Deteksi Notifikasi Pembayaran Android otomatis (ShopeePay, SeaBank, DANA, GoPay, BRImo)',
+              'Mendukung Mode Antrean Konfirmasi 1-ketuk & Mode Auto-Catat Langsung di background',
+              'Pemetaan rekening per aplikasi pembayaran & filter anti-promo/anti-OTP',
+              'Update Otomatis & perbaikan performa sinkronisasi CUAN Mobile',
             ],
           };
           fs.writeFileSync('release-assets/cuan-version.json', JSON.stringify(meta, null, 2));
